@@ -117,7 +117,15 @@ label.f{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .set.on{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
 .kg{width:86px!important;padding:7px 9px!important;text-align:center}
 .tip{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px}
-.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.week{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.lift{width:100%;text-align:left;border:0;background:transparent;padding:10px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto 84px;gap:10px;align-items:center}
+.lift:first-child{border-top:0}
+.lift b{font-weight:600;display:block}
+.lift small{font-size:12px;color:var(--muted)}
+.lift .v{text-align:right;font-weight:700;white-space:nowrap}
+.lift .v small{display:block;font-weight:500}
+.hist{display:grid;gap:4px;font-size:13px;padding:0 0 10px}
+.hist div{display:flex;justify-content:space-between}
 .week button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 0;display:grid;gap:1px;justify-items:center;min-width:0}
 .week button b{font-size:12px}
 .week button span{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -296,6 +304,22 @@ const WEEK={
    {t:'Recovery',items:[E('walk','Easy walk',1,'30–45 min','—',false),E('prep','Meal prep for Mon–Wed',1,'rice, chicken, sweet potato','—',false),E('checkin','Weekly check-in: compare the 7-day average weight',1,'Progress tab','—',false)]}]},
 };
 
+/* ---------- 8-day cycle: 3 training days, 1 rest, repeat ---------- */
+const START='2026-11-09';
+const CYCLE=['push','pull','legs','rest','upper','lower','stamina','rest2'];
+const REST_ITEMS=[E('walk','Easy walk',1,'30–45 min','—',false),E('mob','Mobility: cat-cow, hip flexor stretch, thoracic rotations',1,'10 min','—',false,'Good for a stiff lower back after sitting all day.')];
+const PLANS={
+ push:WEEK[1],pull:WEEK[2],legs:WEEK[3],upper:WEEK[5],lower:WEEK[6],
+ stamina:{...WEEK[4],type:'train'},
+ rest:{name:'Rest',sub:'Recover · Walk · Meal prep',type:'rest',blocks:[{t:'Recovery',items:[...REST_ITEMS,E('prep','Meal prep for the next 3 days',1,'rice, chicken, sweet potato','—',false)]}]},
+ rest2:{name:'Rest',sub:'Recover · Weekly check-in',type:'rest',blocks:[{t:'Recovery',items:[...REST_ITEMS,E('checkin','Check-in: compare your 7-day average weight',1,'Progress tab','—',false),E('prep2','Shop and meal prep for the next cycle',1,'Shop tab','—',false)]}]},
+ prep:{name:'Prep',sub:'Day 0 · Program starts tomorrow',type:'rest',blocks:[{t:'Get ready',items:[E('shop0','Buy the groceries',1,'Shop tab','—',false),E('cook0','Cook rice, chicken and sweet potato for 2 days',1,'about 1 h','—',false),E('photo0','Take starting photos: front, side, back',1,'same light every time','—',false,'Photos show muscle gain better than the scale.'),E('sleep0','In bed early, 7–9 h sleep',1,'tonight','—',false),E('weigh0','Weigh in tomorrow morning before food',1,'Progress tab','—',false)]}]},
+};
+const NODEMO=new Set(['walk','mob','steps','prep','prep2','checkin','shop0','cook0','photo0','sleep0','weigh0']);
+const daysBetween=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+const cycleIdx=s=>((daysBetween(START,s)%8)+8)%8;
+const planKey=s=>s<START?'prep':CYCLE[cycleIdx(s)];
+
 /* ---------- demos (public-domain frames from free-exercise-db) & form videos ---------- */
 const IMG={bench:'Barbell_Bench_Press_-_Medium_Grip',incdb:'Incline_Dumbbell_Press',sdbp:'Dumbbell_Shoulder_Press',latr:'Side_Lateral_Raise',dips:'Dips_-_Triceps_Version',push:'Triceps_Pushdown_-_Rope_Attachment',pullup:'Pullups',csrow:'Dumbbell_Incline_Row',latpd:'Wide-Grip_Lat_Pulldown',fpull:'Face_Pull',curl:'EZ-Bar_Curl',hammer:'Hammer_Curls',neck:'Lying_Face_Up_Plate_Neck_Resistance',z2a:'Walking_Treadmill',lpress:'Leg_Press',sllp:'Leg_Press',lext:'Leg_Extensions',slcurl:'Seated_Leg_Curl',hipt:'Barbell_Hip_Thrust',scalf:'Seated_Calf_Raise',z2b:'Bicycling_Stationary',incbb:'Barbell_Incline_Bench_Press_-_Medium_Grip',hpd:'Close-Grip_Front_Lat_Pulldown',dbrow:'One-Arm_Dumbbell_Row',mshp:'Machine_Shoulder_Military_Press',pdeck:'Butterfly',latr2:'Seated_Side_Lateral_Raise',incurl:'Incline_Dumbbell_Curl',skull:'EZ-Bar_Skullcrusher',lpress2:'Leg_Press',gbridge:'Barbell_Glute_Bridge',llcurl:'Lying_Leg_Curls',slext:'Single-Leg_Leg_Extension',abduct:'Thigh_Abductor',lpcalf:'Calf_Press_On_The_Leg_Press_Machine',cckr:'Knee_Hip_Raise_On_Parallel_Bars',plank:'Plank',deadbug:'Dead_Bug',splank:'Side_Bridge',pallof:'Pallof_Press',vacuum:'Stomach_Vacuum',mclimb:'Mountain_Climbers',hiit:'Bicycling_Stationary',iso:'Isometric_Neck_Exercise_-_Sides'};
 const FACE_VIDEOS=[
@@ -354,7 +378,7 @@ const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 const fmtDate=s=>{const d=parse(s);return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]};
 const uid=()=>Math.random().toString(36).slice(2,10);
 const foodById=id=>FOODS.find(f=>f.id===id)||(S.profile.customFoods||[]).find(f=>f.id===id);
-const dayPlan=s=>WEEK[parse(s).getDay()];
+const dayPlan=s=>PLANS[planKey(s)];
 const dayType=s=>dayPlan(s).type==='train'?'train':'rest';
 function targets(s){const t={...TARGET[dayType(s)]};const a=S.profile.calAdj||0;t.kcal+=a;t.c+=r0(a/4);return t}
 function entryFrom(f,qty,meal,plan=false){const e={id:uid(),fid:f.id,name:f.n,unit:f.u,meal,qty,kcal:r0(f.k*qty),p:r1(f.p*qty),c:r1(f.c*qty),f:r1(f.f*qty)};if(plan)e.plan=true;return e}
@@ -405,8 +429,8 @@ function renderSync(){$('#sync').textContent=Cloud.ready?(Cloud.err?'Could not s
 
 /* ---------- state ---------- */
 const TODAY=ymd(new Date());
-const blankDay=()=>({foods:[],water:0,sets:{},kg:{},routine:{},habits:{},supps:{},sleep:''});
-const blankProfile=()=>({weights:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},calAdj:0});
+const blankDay=()=>({foods:[],water:0,sets:{},kg:{},reps:{},routine:{},habits:{},supps:{},sleep:''});
+const blankProfile=()=>({weights:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},liftLog:{},calAdj:0});
 const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null};
 try{const t=localStorage.getItem(LS+'tab');if(t)S.tab=t}catch(e){}
 const dayKey=s=>'day-'+s;
@@ -443,7 +467,7 @@ function macroBar(label,color,val,target,unit='g'){
   return `<div class="mac"><div class="row between"><span class="row" style="gap:6px"><i class="plate" style="background:var(${color})"></i>${label}</span><span class="num"><b>${r0(val)}</b> / ${target}${unit}</span></div><div class="bar"><i style="width:${pct}%;background:var(${color})"></i></div></div>`;
 }
 function workoutProgress(s,day){
-  const p=WEEK[parse(s).getDay()];let total=0,done=0;
+  const p=dayPlan(s);let total=0,done=0;
   p.blocks.forEach(b=>b.items.forEach(e=>{total+=e.s;done+=(day.sets[e.id]||[]).filter(Boolean).length}));
   return{total,done};
 }
@@ -507,16 +531,16 @@ function viewFood(){
 }
 
 function viewTrain(){
-  const sel=S.trainDay??parse(S.date).getDay();
-  const p=WEEK[sel],isLogDay=sel===parse(S.date).getDay();
-  const order=[1,2,3,4,5,6,0];
+  const cur=planKey(S.date),sel=S.trainDay??cur;
+  const p=PLANS[sel],isLogDay=sel===cur;
+  const base=S.date<START?START:addDays(S.date,-cycleIdx(S.date));
   return `
   <section class="card">
-    <div class="eyebrow">Weekly split</div>
-    <div class="week">${order.map(i=>`<button class="${i===sel?'on':''} ${i===new Date().getDay()?'today':''}" data-a="trainDay" data-v="${i}"><b>${DOW[i]}</b><span>${esc(WEEK[i].name)}</span></button>`).join('')}</div>
+    <div class="row between"><div class="eyebrow">8-day cycle · 3 on, 1 off</div>${cur==='prep'?'<span class="chip">Starts tomorrow</span>':`<span class="chip num">Day ${cycleIdx(S.date)+1} of 8</span>`}</div>
+    <div class="week">${CYCLE.map((k,i)=>{const d=addDays(base,i),dd=parse(d);return `<button class="${k===sel?'on':''} ${d===TODAY?'today':''}" data-a="trainDay" data-v="${k}"><b>${esc(PLANS[k].name)}</b><span>${DOW[dd.getDay()]} ${dd.getDate()}</span></button>`}).join('')}</div>
   </section>
   <section class="card">
-    <div class="row between"><div><h2>${esc(p.name)}</h2><p class="muted">${esc(p.sub)}</p></div>${isLogDay?`<span class="chip">Logging ${esc(fmtDate(S.date))}</span>`:`<button class="btn ghost sm" data-a="trainDay" data-v="${parse(S.date).getDay()}">Back to ${DOW[parse(S.date).getDay()]}</button>`}</div>
+    <div class="row between"><div><h2>${esc(p.name)}</h2><p class="muted">${esc(p.sub)}</p></div>${isLogDay?`<span class="chip">Logging ${esc(fmtDate(S.date))}</span>`:`<button class="btn ghost sm" data-a="trainDay" data-v="${cur}">Back to ${esc(fmtDate(S.date).split(' ')[0])}</button>`}</div>
     ${p.type==='train'?`<p class="muted" style="font-size:13px">Warm up with 2 light sets on the first lift. When you hit the top of the rep range on every set, add 2.5 kg next time.</p>`:''}
     <p class="callout" style="font-size:13px">Back-safe plan: no squats, deadlifts, bent-over rows, standing overhead presses, ab wheel or twists. Machines and benches support your spine. If any move hurts your lower back, stop it and see a physio.</p>
   </section>
@@ -524,23 +548,23 @@ function viewTrain(){
      const sets=S.day.sets[e.id]||[],last=S.profile.lifts[e.id];
      const open=S.openDemo===e.id;
      return `<div class="ex"><div class="head"><b>${esc(e.n)}</b><span class="meta num">${e.s>1?e.s+' × ':''}${esc(e.r)}</span></div>
-       <div class="row between"><div class="meta">Rest ${esc(e.rest)}${e.w&&last?` · Last: <b class="num" style="color:var(--ink)">${esc(last.kg)} kg</b> on ${esc(fmtDate(last.date))}`:''}</div>${['mob','steps','walk','prep','checkin'].includes(e.id)?'':`<button class="demo-btn" data-a="demo" data-v="${e.id}" aria-expanded="${open}">${open?'Hide demo':'▶ Demo'}</button>`}</div>
+       <div class="row between"><div class="meta">Rest ${esc(e.rest)}${e.w&&last?` · Last: <b class="num" style="color:var(--ink)">${esc(last.kg)} kg</b> on ${esc(fmtDate(last.date))}`:''}</div>${NODEMO.has(e.id)?'':`<button class="demo-btn" data-a="demo" data-v="${e.id}" aria-expanded="${open}">${open?'Hide demo':'▶ Demo'}</button>`}</div>
        ${open?`${demo(e.id)}${vlink(exVideo(e))}`:''}
        ${e.tip?`<div class="tip">${esc(e.tip)}</div>`:''}
-       ${isLogDay?`<div class="sets">${Array.from({length:e.s},(_,i)=>`<button class="set ${sets[i]?'on':''}" data-a="set" data-v="${e.id}" data-i="${i}" aria-label="Set ${i+1}">${e.s>1?i+1:'Done'}</button>`).join('')}${e.w?`<input id="kg-${e.id}" type="number" inputmode="decimal" step="0.5" class="kg" placeholder="kg" value="${esc(S.day.kg[e.id]||'')}" data-c="kg" data-v="${e.id}" aria-label="${esc(e.n)} working weight kg">`:''}</div>`:''}
+       ${isLogDay?`<div class="sets">${Array.from({length:e.s},(_,i)=>`<button class="set ${sets[i]?'on':''}" data-a="set" data-v="${e.id}" data-i="${i}" aria-label="Set ${i+1}">${e.s>1?i+1:'Done'}</button>`).join('')}${e.w?`<input id="kg-${e.id}" type="number" inputmode="decimal" step="0.5" class="kg" placeholder="kg" value="${esc(S.day.kg[e.id]||'')}" data-c="kg" data-v="${e.id}" aria-label="${esc(e.n)} working weight kg"><input id="reps-${e.id}" type="number" inputmode="numeric" step="1" class="kg" style="width:70px!important" placeholder="reps" value="${esc((S.day.reps||{})[e.id]||'')}" data-c="reps" data-v="${e.id}" aria-label="${esc(e.n)} reps on best set">`:''}</div>`:''}
      </div>`}).join('')}</div></section>`).join('')}`;
 }
 
 function viewVideos(){
-  const order=[1,2,3,4,5,6];
+  const order=['push','pull','legs','upper','lower','stamina'];
   const card=(e,sub)=>`<div class="vitem">${IMG[e.id]?demo(e.id):`<div class="noimg">Video only</div>`}<b>${esc(e.n)}</b><small>${esc(sub)}</small>${vlink(exVideo(e),'Watch video')}</div>`;
   return `
   <section class="card">
     <div class="eyebrow">Form library</div><h2>Exercise videos</h2>
     <p class="muted" style="font-size:13px">Each picture loops between the start and end position and works offline. “Watch video” opens YouTube form tutorials for that exercise and needs internet.</p>
   </section>
-  ${order.map(i=>{const p=WEEK[i];const items=p.blocks.flatMap(b=>b.items.filter(e=>!['mob','steps'].includes(e.id)).map(e=>[e,b.t]));
-    return `<section class="card"><div class="row between"><h3>${DOW[i]} · ${esc(p.name)}</h3><span class="muted" style="font-size:12px">${items.length} moves</span></div><div class="vgrid">${items.map(([e,t])=>card(e,t+' · '+(e.s>1?e.s+' × ':'')+e.r)).join('')}</div></section>`}).join('')}
+  ${order.map(k=>{const p=PLANS[k];const items=p.blocks.flatMap(b=>b.items.filter(e=>!NODEMO.has(e.id)).map(e=>[e,b.t]));
+    return `<section class="card"><div class="row between"><h3>Day ${CYCLE.indexOf(k)+1} · ${esc(p.name)}</h3><span class="muted" style="font-size:12px">${items.length} moves</span></div><div class="vgrid">${items.map(([e,t])=>card(e,t+' · '+(e.s>1?e.s+' × ':'')+e.r)).join('')}</div></section>`}).join('')}
   <section class="card"><h3>Face &amp; jaw</h3><div class="vgrid">${FACE_VIDEOS.map(([k,n,q])=>`<div class="vitem">${IMG[k]?demo(k):`<div class="noimg">Video only</div>`}<b>${esc(n)}</b>${vlink(yt(q),'Watch video')}</div>`).join('')}</div></section>`;
 }
 
@@ -558,6 +582,43 @@ function viewFace(){
     <b>What actually changes your jawline</b>
     <p>Your scan shows about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, so there is no face fat to lose. A puffy face at your leanness comes from water: salt swings, poor sleep, alcohol and late salty meals. Definition comes from posture, a stronger neck and chewing muscles, and steady water balance. Bone structure sets the rest.</p>
     <p>A lean bulk adds a little softness to the face. That is normal, and you will still be lean.</p>
+  </section>`;
+}
+
+/* ---------- strength log: profile.liftLog[exerciseId][date] = {kg, reps} ---------- */
+function logLift(id){
+  const kg=parseFloat(S.day.kg[id]),reps=parseInt((S.day.reps||{})[id])||null;
+  const ex={...((S.profile.liftLog||{})[id]||{})};
+  if(kg>0)ex[S.date]={kg,reps};else delete ex[S.date];
+  S.profile.liftLog={...(S.profile.liftLog||{}),[id]:ex};
+  if(kg>0&&S.date>=((S.profile.lifts[id]||{}).date||''))S.profile.lifts={...S.profile.lifts,[id]:{kg:String(kg),date:S.date}};
+  saveProfile();
+}
+const e1rm=x=>x.reps?x.kg*(1+x.reps/30):x.kg;
+const fmtSet=x=>x.kg+' kg'+(x.reps?' × '+x.reps:'');
+function spark(vals){
+  if(vals.length<2)return '<svg width="84" height="28"></svg>';
+  const lo=Math.min(...vals),hi=Math.max(...vals),rg=hi-lo||1;
+  const pts=vals.map((v,i)=>[2+i/(vals.length-1)*80,24-(v-lo)/rg*20]);
+  const last=pts[pts.length-1];
+  return `<svg width="84" height="28" viewBox="0 0 84 28" aria-hidden="true"><path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="var(--prot)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="var(--prot)"/></svg>`;
+}
+function viewStrength(){
+  const log=S.profile.liftLog||{},seen=new Set(),rows=[];
+  CYCLE.forEach(k=>PLANS[k].blocks.forEach(b=>b.items.forEach(e=>{
+    if(!e.w||seen.has(e.id))return;seen.add(e.id);
+    const h=log[e.id]||{},ds=Object.keys(h).sort();if(!ds.length)return;
+    const best=ds.reduce((a,d)=>e1rm(h[d])>e1rm(h[a])?d:a,ds[0]);
+    rows.push({e,h,ds,best,first:h[ds[0]],last:h[ds[ds.length-1]]});
+  })));
+  const prs=rows.filter(r=>r.ds.length>1&&r.best===r.ds[r.ds.length-1]).length;
+  return `<section class="card">
+    <div class="row between"><h3>Strength</h3>${rows.length?`<span class="chip ${prs?'ok':''}">${prs} lift${prs===1?'':'s'} at a PR</span>`:''}</div>
+    ${rows.length?`<p class="muted" style="font-size:12.5px">Log kg and reps of your best set in the Train tab. PR = your strongest set so far, counting reps. Tap a lift for its history.</p><div>${rows.map(r=>{
+      const up=r.last.kg-r.first.kg,open=S.openLift===r.e.id;
+      return `<button class="lift" data-a="lift" data-v="${r.e.id}" aria-expanded="${open}"><span style="min-width:0"><b>${esc(r.e.n)}</b><small>PR ${esc(fmtSet(r.h[r.best]))} · ${r.ds.length} session${r.ds.length===1?'':'s'}</small></span><span class="v num">${esc(fmtSet(r.last))}<small style="color:${up>0?'var(--kcal)':'var(--muted)'}">${up>0?'+'+r1(up)+' kg':up<0?r1(up)+' kg':'start'}</small></span>${spark(r.ds.map(d=>e1rm(r.h[d])))}</button>
+      ${open?`<div class="hist num">${r.ds.slice().reverse().slice(0,10).map(d=>`<div><span class="muted">${esc(fmtDate(d))}</span><span>${esc(fmtSet(r.h[d]))}${d===r.best?' · PR':''}</span></div>`).join('')}</div>`:''}`}).join('')}</div>`
+    :`<p class="muted" style="font-size:13px">No lifts logged yet. In the Train tab, type the kg and reps of your best set for each exercise. Your strength history and PRs show up here.</p>`}
   </section>`;
 }
 
@@ -627,6 +688,7 @@ function viewProgress(){
     </div>
     ${chart()}
   </section>
+  ${viewStrength()}
   <section class="card">
     <div class="row between"><h3>Calorie adjustment</h3><span class="chip num">${adj>0?'+':''}${adj} kcal</span></div>
     <p class="muted" style="font-size:13px">Aim for ${GOAL.rateLo}–${GOAL.rateHi} kg per week. If the weekly average barely moves for 2 weeks, add 150 kcal (easiest: 150 g cottage cheese before bed, or 50 g more rice). If you gain over 0.5 kg a week, take 150 off. Changes go on top of carbs.</p>
@@ -717,8 +779,9 @@ const actions={
   routine(v){S.day.routine[v]=!S.day.routine[v];saveDay();render()},
   habit(v){S.day.habits[v]=!S.day.habits[v];saveDay();render()},
   set(v,el){const i=Number(el.dataset.i),a=(S.day.sets[v]||[]).slice();a[i]=!a[i];S.day.sets[v]=a;saveDay();render()},
-  trainDay(v){S.trainDay=Number(v);S.openDemo=null;render()},
+  trainDay(v){S.trainDay=v;S.openDemo=null;render()},
   demo(v){S.openDemo=S.openDemo===v?null:v;render()},
+  lift(v){S.openLift=S.openLift===v?null:v;render()},
   delFood(v){S.day.foods=S.day.foods.filter(e=>e.id!==v);saveDay();render()},
   logPlan(v){
     const m=MEALS.find(x=>x.id===v),type=dayType(S.date);
@@ -783,7 +846,7 @@ document.addEventListener('change',ev=>{
     }catch(e){S.backupMsg='That file is not a GYMBRO backup. Pick a file named gymbro-backup-….json.'}
     render();
   })}
-  if(c==='kg'){const id=el.dataset.v;S.day.kg[id]=el.value;saveDay();if(el.value&&S.date>=((S.profile.lifts[id]||{}).date||'')){S.profile.lifts={...S.profile.lifts,[id]:{kg:el.value,date:S.date}};saveProfile()}}
+  if(c==='kg'||c==='reps'){const id=el.dataset.v;S.day[c]={...(S.day[c]||{}),[id]:el.value};saveDay();logLift(id)}
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight();if(ev.key==='Enter'&&ev.target.id==='nameIn')actions.saveName()});
 
