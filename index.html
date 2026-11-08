@@ -125,6 +125,20 @@ label.f{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .week button.on span{color:inherit;opacity:.75}
 .week button.today{box-shadow:inset 0 -3px 0 var(--carb)}
 
+/* demos & videos */
+.demo{position:relative;aspect-ratio:3/2;max-width:100%;border-radius:10px;overflow:hidden;background:#101317}
+.demo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.demo img+img{animation:flip 1.8s linear infinite}
+@keyframes flip{0%,48%{opacity:0}52%,96%{opacity:1}100%{opacity:0}}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.vitem{display:grid;gap:6px;align-content:start;min-width:0}
+.vitem b{font-weight:600;font-size:14px;line-height:1.25}
+.vitem small{font-size:12px;color:var(--muted)}
+.vlink{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:var(--carb);text-decoration:none;padding:4px 0}
+.vlink svg{width:16px;height:16px;flex:none}
+.noimg{aspect-ratio:3/2;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;color:var(--muted);font-size:12px;font-weight:600;text-align:center;padding:8px}
+.demo-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;font-size:12px;font-weight:600;padding:3px 8px;flex:none}
+
 /* food */
 .meal{display:grid;gap:6px}
 .meal .mh{display:flex;align-items:baseline;gap:8px}
@@ -156,13 +170,13 @@ label.f{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 ul.clean{margin:0;padding-left:18px;display:grid;gap:5px}
 
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
-nav.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
-nav.tabbar button{border:0;background:transparent;display:grid;justify-items:center;gap:2px;padding:4px 0;color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.03em}
+nav.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(7,1fr)}
+nav.tabbar button{border:0;background:transparent;display:grid;justify-items:center;gap:2px;padding:4px 0;color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.02em;min-width:0}
 nav.tabbar button svg{width:22px;height:22px}
 nav.tabbar button.on{color:var(--ink)}
 .sync{font-size:11px;color:var(--muted);text-align:center;padding-top:4px}
 @media (max-width:380px){.hero{grid-template-columns:1fr;justify-items:center}.macros{width:100%}.stats{grid-template-columns:1fr 1fr}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.demo img+img{animation:none;opacity:0}}
 </style>
 
 <header class="top wrap" style="padding-bottom:10px">
@@ -253,33 +267,50 @@ const MEALS=[
 
 /* ---------- training week (index = Date.getDay()) ---------- */
 const E=(id,n,s,r,rest,w=true,tip='')=>({id,n,s,r,rest,w,tip});
-const ABS_A=[E('hkr','Hanging knee raise',3,'12','60 s',false),E('ccrunch','Cable crunch',3,'12–15','60 s'),E('plank','Plank',3,'45 s','45 s',false)];
-const ABS_B=[E('wheel','Ab wheel rollout',3,'8–12','60 s',false,'Keep ribs down and hips tucked. Start from the knees.'),E('splank','Side plank',3,'30 s / side','30 s',false),E('deadbug','Dead bug',3,'10 / side','45 s',false)];
-const ABS_C=[E('hlr','Hanging leg raise',3,'10','60 s',false,'Curl the pelvis up and avoid swinging.'),E('twist','Russian twist (plate)',3,'20','45 s'),E('vacuum','Stomach vacuum',3,'20 s hold','30 s',false,'Exhale fully, pull the belly button to the spine. Trains a tighter waist.')];
-const NECK=[E('neck','Neck curl + extension (plate)',2,'15 each','60 s',true,'A thicker neck frames the jaw. Go light and slow; never jerk.')];
+// Back-safe program: nothing that loads the spine (no squats, deadlifts, bent-over rows, standing overhead work, ab wheel or twists).
+const ABS_A=[E('cckr',"Captain's chair knee raise",3,'12','60 s',false,"Back pressed into the pad the whole time. Lift the knees, don't swing."),E('mcurl','McGill curl-up',3,'6 × 10 s holds','45 s',false,'One knee bent, hands under your lower back to keep its natural curve. Lift only the head and shoulders a little.'),E('plank','Plank',3,'45 s','45 s',false,'Squeeze the glutes, ribs down. End the set if your lower back sags.')];
+const ABS_B=[E('deadbug','Dead bug',3,'10 / side','45 s',false,'Lower back stays flat on the floor as the arm and leg extend.'),E('splank','Side plank',3,'30 s / side','30 s',false),E('birddog','Bird dog',3,'8 / side, 5 s hold','45 s',false,'Reach long with the opposite arm and leg. Hips level, back flat.')];
+const ABS_C=[E('pallof','Pallof press',3,'12 / side','45 s',true,'Stand side-on to a cable, press straight out and resist the twist.'),E('vacuum','Stomach vacuum',3,'20 s hold','30 s',false,'Exhale fully, pull the belly button to the spine. Trains a tighter waist.'),E('mclimb','Slow mountain climbers',3,'20','45 s',false,'Hips level with the shoulders, slow and controlled.')];
+const NECK=[E('neck','Neck curl + extension (plate, lying)',2,'15 each','60 s',true,'A thicker neck frames the jaw. Go light and slow; never jerk.')];
 const WEEK={
  1:{name:'Push',sub:'Chest · Shoulders · Triceps',type:'train',blocks:[
-   {t:'Lifts',items:[E('bench','Barbell bench press',4,'6–8','2–3 min',true,'Shoulder blades pinned, feet planted, bar to lower chest.'),E('incdb','Incline dumbbell press',3,'8–10','2 min'),E('sdbp','Seated DB shoulder press',3,'8–10','2 min'),E('latr','Lateral raise',4,'12–15','60 s',true,'Lead with the elbows; stop at shoulder height.'),E('dips','Dips (weighted or machine)',3,'8–12','90 s'),E('push','Rope triceps pushdown',3,'10–12','60 s')]},
+   {t:'Lifts',items:[E('bench','Barbell bench press',4,'6–8','2–3 min',true,'Shoulder blades pinned, feet flat, bar to lower chest. Keep your butt on the bench.'),E('incdb','Incline dumbbell press',3,'8–10','2 min'),E('sdbp','Seated DB shoulder press (back rest)',3,'8–10','2 min',true,'Set the bench upright and keep your back on the pad. No arching.'),E('latr','Lateral raise',4,'12–15','60 s',true,'Lead with the elbows; stop at shoulder height.'),E('dips','Dips (weighted or machine)',3,'8–12','90 s'),E('push','Rope triceps pushdown',3,'10–12','60 s')]},
    {t:'Abs A',items:ABS_A}]},
  2:{name:'Pull',sub:'Back · Biceps · Neck + 15 min cardio',type:'train',blocks:[
-   {t:'Lifts',items:[E('pullup','Pull-up (assisted if needed)',4,'6–10','2 min',true,'Full hang to chin over bar. Log added or assisted kg.'),E('bbrow','Barbell row',4,'6–8','2 min'),E('latpd','Lat pulldown',3,'10–12','90 s'),E('crow','Seated cable row',3,'10–12','90 s'),E('fpull','Face pull',3,'15','60 s'),E('curl','EZ-bar curl',3,'8–10','60 s'),E('hammer','Hammer curl',3,'10–12','60 s')]},
+   {t:'Lifts',items:[E('pullup','Pull-up (assisted if needed)',4,'6–10','2 min',true,'Full hang to chin over bar. Log added or assisted kg.'),E('csrow','Chest-supported dumbbell row',4,'8–10','2 min',true,'Lie face down on an incline bench. Your chest takes the load, not your lower back.'),E('latpd','Lat pulldown',3,'10–12','90 s'),E('mrow','Machine row (chest pad)',3,'10–12','90 s',true,'Chest stays on the pad. Pull with the elbows.'),E('fpull','Face pull',3,'15','60 s'),E('curl','EZ-bar curl',3,'8–10','60 s',true,'Elbows pinned to your sides. No leaning back.'),E('hammer','Hammer curl (seated)',3,'10–12','60 s')]},
    {t:'Neck',items:NECK},
    {t:'Stamina',items:[E('z2a','Zone 2: incline walk or bike',1,'15 min','—',false,'Heart rate about 115–135 bpm. You can talk in full sentences.')]}]},
  3:{name:'Legs',sub:'Quads · Hamstrings · Calves',type:'train',blocks:[
-   {t:'Lifts',items:[E('squat','Back squat',4,'5–8','3 min',true,'Brace before you descend, hit parallel or below.'),E('rdl','Romanian deadlift',3,'8–10','2 min',true,'Push hips back, soft knees, bar close to legs.'),E('lpress','Leg press',3,'10–12','2 min'),E('lcurl','Leg curl',3,'10–12','90 s'),E('lunge','Walking lunge (DB)',2,'12 / leg','90 s'),E('calf','Standing calf raise',4,'10–15','60 s')]},
+   {t:'Lifts',items:[E('lpress','Leg press',4,'8–10','2–3 min',true,'Lower back stays on the seat. Stop before your hips curl up.'),E('sllp','Single-leg leg press',3,'10 / leg','90 s',true,'Light weight, full control. Fixes left-right imbalances without loading the spine.'),E('lext','Leg extension',3,'12–15','60 s'),E('slcurl','Seated leg curl',3,'10–12','90 s'),E('hipt','Hip thrust (machine or bench)',3,'10','90 s',true,'Chin tucked, ribs down. Finish with the glutes and never arch the lower back.'),E('scalf','Seated calf raise',4,'12–15','60 s')]},
    {t:'Abs B',items:ABS_B}]},
  4:{name:'Stamina',sub:'Cardio · Mobility · No lifting',type:'rest',blocks:[
-   {t:'Conditioning',items:[E('z2b','Zone 2 cardio (bike, incline walk, swim)',1,'35–40 min','—',false,'Heart rate about 115–135 bpm. This builds the engine without eating your bulk.'),E('mob','Mobility: hips, thoracic spine, shoulders',1,'10 min','—',false),E('steps','Steps',1,'8–10k','—',false)]}]},
+   {t:'Conditioning',items:[E('z2b','Zone 2 cardio (bike, incline walk, swim)',1,'35–40 min','—',false,'Heart rate about 115–135 bpm. This builds the engine without eating your bulk.'),E('mob','Mobility: cat-cow, hip flexor stretch, thoracic rotations',1,'10 min','—',false,'Good for a stiff lower back after sitting all day.'),E('steps','Steps',1,'8–10k','—',false)]}]},
  5:{name:'Upper',sub:'Strength focus · Neck',type:'train',blocks:[
-   {t:'Lifts',items:[E('incbb','Incline barbell press',4,'5–8','2–3 min'),E('wpull','Weighted pull-up or heavy pulldown',4,'6–8','2 min'),E('dbrow','One-arm dumbbell row',3,'8–10','90 s'),E('mshp','Machine shoulder press',3,'8–10','90 s'),E('cfly','Cable fly',3,'12–15','60 s'),E('latr2','Lateral raise',3,'15','60 s'),E('incurl','Incline DB curl',3,'10','60 s'),E('ohext','Overhead triceps extension',3,'10–12','60 s')]},
+   {t:'Lifts',items:[E('incbb','Incline barbell press',4,'5–8','2–3 min'),E('hpd','Heavy lat pulldown (or weighted pull-up)',4,'6–8','2 min'),E('dbrow','One-arm dumbbell row (knee on bench)',3,'8–10','90 s',true,'Hand and knee on the bench support your spine. Back flat.'),E('mshp','Machine shoulder press',3,'8–10','90 s'),E('pdeck','Pec deck / machine fly',3,'12–15','60 s'),E('latr2','Seated lateral raise',3,'15','60 s'),E('incurl','Incline DB curl',3,'10','60 s'),E('skull','EZ-bar skullcrusher',3,'10–12','60 s',true,'Lying on the bench keeps the spine supported, unlike standing overhead work.')]},
    {t:'Neck',items:NECK}]},
- 6:{name:'Lower',sub:'Posterior chain · Abs · Finisher',type:'train',blocks:[
-   {t:'Lifts',items:[E('dl','Deadlift',3,'4–6','3 min',true,'Bar over mid-foot, lats tight, push the floor away.'),E('bss','Bulgarian split squat',3,'8–10 / leg','2 min'),E('hipt','Hip thrust',3,'8–10','2 min'),E('lext','Leg extension',3,'12–15','60 s'),E('lcurl2','Leg curl',3,'12','60 s'),E('scalf','Seated calf raise',3,'15','60 s')]},
+ 6:{name:'Lower',sub:'Glutes · Hamstrings · Abs · Finisher',type:'train',blocks:[
+   {t:'Lifts',items:[E('lpress2','Leg press, feet high and wide',4,'8–10','2 min',true,'Higher feet shift the work to glutes and hamstrings. Hips stay on the seat.'),E('gbridge','Glute bridge (barbell or machine)',3,'10–12','90 s',true,'Ribs down, squeeze the glutes at the top. No lower-back arch.'),E('llcurl','Lying leg curl',3,'10–12','60 s',true,'Hips stay down on the pad.'),E('slext','Single-leg extension',3,'12 / leg','60 s'),E('abduct','Hip abduction machine',3,'15','60 s'),E('lpcalf','Calf press on the leg press',4,'15','60 s')]},
    {t:'Abs C',items:ABS_C},
-   {t:'Finisher',items:[E('hiit','Bike or rower intervals: 20 s hard / 70 s easy',8,'rounds','—',false,'About 12 minutes. Raises your top-end stamina.')]}]},
+   {t:'Finisher',items:[E('hiit','Bike intervals: 20 s hard / 70 s easy',8,'rounds','—',false,'About 12 minutes on a bike or air bike. Builds top-end stamina with no load on your back.')]}]},
  0:{name:'Rest',sub:'Recover · Walk · Meal prep',type:'rest',blocks:[
    {t:'Recovery',items:[E('walk','Easy walk',1,'30–45 min','—',false),E('prep','Meal prep for Mon–Wed',1,'rice, chicken, sweet potato','—',false),E('checkin','Weekly check-in: compare the 7-day average weight',1,'Progress tab','—',false)]}]},
 };
+
+/* ---------- demos (public-domain frames from free-exercise-db) & form videos ---------- */
+const IMG={bench:'Barbell_Bench_Press_-_Medium_Grip',incdb:'Incline_Dumbbell_Press',sdbp:'Dumbbell_Shoulder_Press',latr:'Side_Lateral_Raise',dips:'Dips_-_Triceps_Version',push:'Triceps_Pushdown_-_Rope_Attachment',pullup:'Pullups',csrow:'Dumbbell_Incline_Row',latpd:'Wide-Grip_Lat_Pulldown',fpull:'Face_Pull',curl:'EZ-Bar_Curl',hammer:'Hammer_Curls',neck:'Lying_Face_Up_Plate_Neck_Resistance',z2a:'Walking_Treadmill',lpress:'Leg_Press',sllp:'Leg_Press',lext:'Leg_Extensions',slcurl:'Seated_Leg_Curl',hipt:'Barbell_Hip_Thrust',scalf:'Seated_Calf_Raise',z2b:'Bicycling_Stationary',incbb:'Barbell_Incline_Bench_Press_-_Medium_Grip',hpd:'Close-Grip_Front_Lat_Pulldown',dbrow:'One-Arm_Dumbbell_Row',mshp:'Machine_Shoulder_Military_Press',pdeck:'Butterfly',latr2:'Seated_Side_Lateral_Raise',incurl:'Incline_Dumbbell_Curl',skull:'EZ-Bar_Skullcrusher',lpress2:'Leg_Press',gbridge:'Barbell_Glute_Bridge',llcurl:'Lying_Leg_Curls',slext:'Single-Leg_Leg_Extension',abduct:'Thigh_Abductor',lpcalf:'Calf_Press_On_The_Leg_Press_Machine',cckr:'Knee_Hip_Raise_On_Parallel_Bars',plank:'Plank',deadbug:'Dead_Bug',splank:'Side_Bridge',pallof:'Pallof_Press',vacuum:'Stomach_Vacuum',mclimb:'Mountain_Climbers',hiit:'Bicycling_Stationary',iso:'Isometric_Neck_Exercise_-_Sides'};
+const FACE_VIDEOS=[
+ ['lymph','Face lymphatic drainage massage','face lymphatic drainage massage depuff'],
+ ['guasha','Gua sha for the jawline','gua sha jawline tutorial men'],
+ ['cold','Ice roller routine','ice roller face depuff routine'],
+ ['tuck','Chin tucks','chin tuck exercise forward head posture'],
+ ['iso','Neck isometrics','4 way neck isometric exercise'],
+ ['tongue','Correct tongue posture','correct tongue posture explained'],
+ ['neckc','Neck curls with a plate','lying plate neck curl extension form'],
+ ['gum','Jaw training with hard gum','mastic gum jaw training safely'],
+];
+const yt=q=>'https://www.youtube.com/results?search_query='+encodeURIComponent(q);
+const exVideo=e=>yt(e.n.replace(/\(.*?\)/g,'')+' proper form');
+const demo=id=>IMG[id]?`<div class="demo"><img src="ex/${IMG[id]}-0.jpg" alt="Start position" loading="lazy"><img src="ex/${IMG[id]}-1.jpg" alt="End position" loading="lazy"></div>`:'';
 
 /* ---------- face / morning routine ---------- */
 const ROUTINE=[
@@ -392,8 +423,11 @@ const IC={
  face:'<path d="M12 3c-4 0-6.5 3-6.5 7 0 3 1 5.5 3 7.5 1 1 2.2 2.5 3.5 2.5s2.5-1.5 3.5-2.5c2-2 3-4.5 3-7.5 0-4-2.5-7-6.5-7Z"/><path d="M9.5 15c1.5 1 3.5 1 5 0"/>',
  progress:'<path d="M4 19h16M5 15l4-4 3 3 6-7"/>',
  shop:'<path d="M5 7h14l-1.5 11a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+ videos:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3V9Z"/>',
 };
-const TABS=[['today','Today'],['food','Food'],['train','Train'],['face','Face'],['progress','Progress'],['shop','Shop']];
+const TABS=[['today','Today'],['food','Food'],['train','Train'],['videos','Videos'],['face','Face'],['progress','Progress'],['shop','Shop']];
+const PLAY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3V9Z"/></svg>';
+const vlink=(href,label='Watch form video')=>`<a class="vlink" href="${href}" target="_blank" rel="noopener">${PLAY}${label}</a>`;
 function renderTabs(){
   $('#tabbar').innerHTML=TABS.map(([id,n])=>`<button data-a="tab" data-v="${id}" class="${S.tab===id?'on':''}" aria-label="${n}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[id]}</svg>${n}</button>`).join('');
 }
@@ -484,21 +518,37 @@ function viewTrain(){
   <section class="card">
     <div class="row between"><div><h2>${esc(p.name)}</h2><p class="muted">${esc(p.sub)}</p></div>${isLogDay?`<span class="chip">Logging ${esc(fmtDate(S.date))}</span>`:`<button class="btn ghost sm" data-a="trainDay" data-v="${parse(S.date).getDay()}">Back to ${DOW[parse(S.date).getDay()]}</button>`}</div>
     ${p.type==='train'?`<p class="muted" style="font-size:13px">Warm up with 2 light sets on the first lift. When you hit the top of the rep range on every set, add 2.5 kg next time.</p>`:''}
+    <p class="callout" style="font-size:13px">Back-safe plan: no squats, deadlifts, bent-over rows, standing overhead presses, ab wheel or twists. Machines and benches support your spine. If any move hurts your lower back, stop it and see a physio.</p>
   </section>
   ${p.blocks.map(b=>`<section class="card"><h3>${esc(b.t)}</h3><div>${b.items.map(e=>{
      const sets=S.day.sets[e.id]||[],last=S.profile.lifts[e.id];
+     const open=S.openDemo===e.id;
      return `<div class="ex"><div class="head"><b>${esc(e.n)}</b><span class="meta num">${e.s>1?e.s+' × ':''}${esc(e.r)}</span></div>
-       <div class="meta">Rest ${esc(e.rest)}${e.w&&last?` · Last: <b class="num" style="color:var(--ink)">${esc(last.kg)} kg</b> on ${esc(fmtDate(last.date))}`:''}</div>
+       <div class="row between"><div class="meta">Rest ${esc(e.rest)}${e.w&&last?` · Last: <b class="num" style="color:var(--ink)">${esc(last.kg)} kg</b> on ${esc(fmtDate(last.date))}`:''}</div>${['mob','steps','walk','prep','checkin'].includes(e.id)?'':`<button class="demo-btn" data-a="demo" data-v="${e.id}" aria-expanded="${open}">${open?'Hide demo':'▶ Demo'}</button>`}</div>
+       ${open?`${demo(e.id)}${vlink(exVideo(e))}`:''}
        ${e.tip?`<div class="tip">${esc(e.tip)}</div>`:''}
        ${isLogDay?`<div class="sets">${Array.from({length:e.s},(_,i)=>`<button class="set ${sets[i]?'on':''}" data-a="set" data-v="${e.id}" data-i="${i}" aria-label="Set ${i+1}">${e.s>1?i+1:'Done'}</button>`).join('')}${e.w?`<input id="kg-${e.id}" type="number" inputmode="decimal" step="0.5" class="kg" placeholder="kg" value="${esc(S.day.kg[e.id]||'')}" data-c="kg" data-v="${e.id}" aria-label="${esc(e.n)} working weight kg">`:''}</div>`:''}
      </div>`}).join('')}</div></section>`).join('')}`;
+}
+
+function viewVideos(){
+  const order=[1,2,3,4,5,6];
+  const card=(e,sub)=>`<div class="vitem">${IMG[e.id]?demo(e.id):`<div class="noimg">Video only</div>`}<b>${esc(e.n)}</b><small>${esc(sub)}</small>${vlink(exVideo(e),'Watch video')}</div>`;
+  return `
+  <section class="card">
+    <div class="eyebrow">Form library</div><h2>Exercise videos</h2>
+    <p class="muted" style="font-size:13px">Each picture loops between the start and end position and works offline. “Watch video” opens YouTube form tutorials for that exercise and needs internet.</p>
+  </section>
+  ${order.map(i=>{const p=WEEK[i];const items=p.blocks.flatMap(b=>b.items.filter(e=>!['mob','steps'].includes(e.id)).map(e=>[e,b.t]));
+    return `<section class="card"><div class="row between"><h3>${DOW[i]} · ${esc(p.name)}</h3><span class="muted" style="font-size:12px">${items.length} moves</span></div><div class="vgrid">${items.map(([e,t])=>card(e,t+' · '+(e.s>1?e.s+' × ':'')+e.r)).join('')}</div></section>`}).join('')}
+  <section class="card"><h3>Face &amp; jaw</h3><div class="vgrid">${FACE_VIDEOS.map(([k,n,q])=>`<div class="vitem">${IMG[k]?demo(k):`<div class="noimg">Video only</div>`}<b>${esc(n)}</b>${vlink(yt(q),'Watch video')}</div>`).join('')}</div></section>`;
 }
 
 function viewFace(){
   return `
   <section class="card">
     <div class="eyebrow">Every morning · about 12 min</div><h2>Face &amp; jaw routine</h2>
-    <div class="list">${ROUTINE.map(([k,n,d])=>`<div class="li"><button class="check ${S.day.routine[k]?'on':''}" data-a="routine" data-v="${k}" aria-label="${esc(n)}"></button><div class="t"><b>${esc(n)}</b><small>${esc(d)}</small></div></div>`).join('')}</div>
+    <div class="list">${ROUTINE.map(([k,n,d])=>{const fv=FACE_VIDEOS.find(v=>v[0]===k);return `<div class="li"><button class="check ${S.day.routine[k]?'on':''}" data-a="routine" data-v="${k}" aria-label="${esc(n)}"></button><div class="t"><b>${esc(n)}</b><small>${esc(d)}</small>${fv?vlink(yt(fv[2]),'Watch how'):''}</div></div>`}).join('')}</div>
   </section>
   <section class="card">
     <h3>All-day anti-bloat habits</h3>
@@ -651,7 +701,7 @@ function renderSheet(){
 /* ---------- render ---------- */
 function render(){
   renderHeader();renderTabs();renderSync();
-  const v={today:viewToday,food:viewFood,train:viewTrain,face:viewFace,progress:viewProgress,shop:viewShop}[S.tab]||viewToday;
+  const v={today:viewToday,food:viewFood,train:viewTrain,videos:viewVideos,face:viewFace,progress:viewProgress,shop:viewShop}[S.tab]||viewToday;
   $('#view').innerHTML=v();
   renderSheet();
 }
@@ -667,7 +717,8 @@ const actions={
   routine(v){S.day.routine[v]=!S.day.routine[v];saveDay();render()},
   habit(v){S.day.habits[v]=!S.day.habits[v];saveDay();render()},
   set(v,el){const i=Number(el.dataset.i),a=(S.day.sets[v]||[]).slice();a[i]=!a[i];S.day.sets[v]=a;saveDay();render()},
-  trainDay(v){S.trainDay=Number(v);render()},
+  trainDay(v){S.trainDay=Number(v);S.openDemo=null;render()},
+  demo(v){S.openDemo=S.openDemo===v?null:v;render()},
   delFood(v){S.day.foods=S.day.foods.filter(e=>e.id!==v);saveDay();render()},
   logPlan(v){
     const m=MEALS.find(x=>x.id===v),type=dayType(S.date);
