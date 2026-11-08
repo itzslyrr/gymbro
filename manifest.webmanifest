@@ -1,0 +1,13 @@
+{
+  "name": "GYMBRO Bulk Tracker",
+  "short_name": "GYMBRO",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ECEEF1",
+  "theme_color": "#12161C",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
