@@ -1,5 +1,5 @@
 // Offline cache for GYMBRO. The version changes on every build, so phones pick up updates.
-const CACHE = 'gymbro-3f8270f3a2';
+const CACHE = 'gymbro-23a439d7ca';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

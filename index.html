@@ -326,7 +326,9 @@ const foodById=id=>FOODS.find(f=>f.id===id)||(S.profile.customFoods||[]).find(f=
 const dayPlan=s=>WEEK[parse(s).getDay()];
 const dayType=s=>dayPlan(s).type==='train'?'train':'rest';
 function targets(s){const t={...TARGET[dayType(s)]};const a=S.profile.calAdj||0;t.kcal+=a;t.c+=r0(a/4);return t}
-function entryFrom(f,qty,meal){return{id:uid(),fid:f.id,name:f.n,unit:f.u,meal,qty,kcal:r0(f.k*qty),p:r1(f.p*qty),c:r1(f.c*qty),f:r1(f.f*qty)}}
+function entryFrom(f,qty,meal,plan=false){const e={id:uid(),fid:f.id,name:f.n,unit:f.u,meal,qty,kcal:r0(f.k*qty),p:r1(f.p*qty),c:r1(f.c*qty),f:r1(f.f*qty)};if(plan)e.plan=true;return e}
+// Plan entries carry plan:true; older ones (logged before that flag existed) are matched by food and amount.
+function isPlanEntry(e,m,type){return e.meal===m.id&&(e.plan||mealItems(m,type).some(([id,q])=>id===e.fid&&q===e.qty))}
 function mealItems(m,type){let it=m.items;if(m.train&&type!=='train')return[];if(type==='rest'&&m.restExtra)it=it.concat(m.restExtra);return it}
 function sumItems(items){return items.reduce((a,[id,q])=>{const f=foodById(id);a.k+=f.k*q;a.p+=f.p*q;a.c+=f.c*q;a.f+=f.f*q;return a},{k:0,p:0,c:0,f:0})}
 function totals(foods){return foods.reduce((a,e)=>{a.k+=e.kcal;a.p+=e.p;a.c+=e.c;a.f+=e.f;return a},{k:0,p:0,c:0,f:0})}
@@ -466,7 +468,7 @@ function viewFood(){
       <div class="mh"><h3>${esc(m.n)}</h3><span class="muted" style="font-size:12px">${esc(m.time)}</span><span class="k num">${r0(mt.k)} kcal</span></div>
       ${items.length?`<p class="plan-hint">Plan: ${items.map(([id,q])=>{const f=foodById(id);return esc(qtyLabel(q)+' × '+f.n+' ('+f.u+')')}).join(', ')} · ${r0(ps.k)} kcal, ${r0(ps.p)}g protein${m.id==='dinner'?'. Swap salmon for lean beef or chicken on other days.':''}</p>`:`<p class="plan-hint">Snacks off-plan, or extra food on days you need more.</p>`}
       ${es.length?`<div class="list">${es.map(e=>`<div class="li"><div class="t"><b>${esc(e.name)}</b><small class="num">${qtyLabel(e.qty)} × ${esc(e.unit)} · P ${r0(e.p)} · C ${r0(e.c)} · F ${r0(e.f)}</small></div><span class="num" style="font-weight:600">${e.kcal}</span><button class="x" data-a="delFood" data-v="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`).join('')}</div>`:''}
-      <div class="row">${items.length?`<button class="btn ghost sm" data-a="logPlan" data-v="${m.id}">Log plan</button>`:''}<button class="btn ghost sm" data-a="openAdd" data-v="${m.id}">+ Food</button></div>
+      <div class="row">${items.length?(es.some(e=>isPlanEntry(e,m,type))?`<button class="btn sm" data-a="unlogPlan" data-v="${m.id}">✓ Logged · Undo</button>`:`<button class="btn ghost sm" data-a="logPlan" data-v="${m.id}">Log plan</button>`):''}<button class="btn ghost sm" data-a="openAdd" data-v="${m.id}">+ Food</button></div>
     </section>`}).join('')}`;
 }
 
@@ -667,7 +669,12 @@ const actions={
   set(v,el){const i=Number(el.dataset.i),a=(S.day.sets[v]||[]).slice();a[i]=!a[i];S.day.sets[v]=a;saveDay();render()},
   trainDay(v){S.trainDay=Number(v);render()},
   delFood(v){S.day.foods=S.day.foods.filter(e=>e.id!==v);saveDay();render()},
-  logPlan(v){const m=MEALS.find(x=>x.id===v);mealItems(m,dayType(S.date)).forEach(([id,q])=>S.day.foods.push(entryFrom(foodById(id),q,m.id)));saveDay();render()},
+  logPlan(v){
+    const m=MEALS.find(x=>x.id===v),type=dayType(S.date);
+    if(S.day.foods.some(e=>isPlanEntry(e,m,type)))return;
+    S.day.foods=S.day.foods.concat(mealItems(m,type).map(([id,q])=>entryFrom(foodById(id),q,m.id,true)));saveDay();render();
+  },
+  unlogPlan(v){const m=MEALS.find(x=>x.id===v),type=dayType(S.date);S.day.foods=S.day.foods.filter(e=>!isPlanEntry(e,m,type));saveDay();render()},
   openAdd(v){S.sheet={mode:'search',meal:v||suggestMeal(),q:'',qty:1};renderSheet();setTimeout(()=>{const i=$('#foodSearch');if(i&&matchMedia('(hover:hover)').matches)i.focus()},50)},
   closeSheet(v,el,ev){if(ev.target!==el)return;S.sheet=null;renderSheet()},
   sheetMeal(v){S.sheet.meal=v;renderSheet()},
