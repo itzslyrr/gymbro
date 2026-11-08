@@ -417,9 +417,11 @@ function viewToday(){
   const wp=workoutProgress(S.date,S.day);
   const rdone=ROUTINE.filter(([k])=>S.day.routine[k]).length;
   const glasses=14;
+  const nm=S.profile.name;
   return `
+  ${nm?'':`<section class="card"><h3>What should I call you?</h3><div class="row"><input id="nameIn" type="text" placeholder="Your first name" autocomplete="given-name"><button class="btn" data-a="saveName">Save</button></div></section>`}
   <section class="card">
-    <div class="row between"><div><div class="eyebrow">${dayType(S.date)==='train'?'Training day':'Rest day'} target</div><h2>${esc(p.name)} day</h2></div>
+    <div class="row between"><div><div class="eyebrow">${nm?esc(nm)+' · ':''}${dayType(S.date)==='train'?'Training day':'Rest day'} target</div><h2>${esc(p.name)} day</h2></div>
       <span class="chip ${left<0?'warn':left<400?'ok':''}">${left>=0?left+' kcal left':(-left)+' kcal over'}</span></div>
     <div class="hero">
       <div class="ring"><svg viewBox="0 0 132 132"><circle cx="66" cy="66" r="56" fill="none" stroke="var(--surface-2)" stroke-width="12"/><circle cx="66" cy="66" r="56" fill="none" stroke="var(--kcal)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/></svg>
@@ -684,6 +686,7 @@ const actions={
   saveWeight(){const v=Number($('#weightIn').value);if(!(v>30&&v<200))return;S.profile.weights={...S.profile.weights,[S.date]:r1(v)};saveProfile();render()},
   adj(v){const n=Number(v);S.profile.calAdj=n===0?0:Math.max(-600,Math.min(900,(S.profile.calAdj||0)+n));saveProfile();render()},
   grocery(v){S.profile.grocery={...S.profile.grocery,[v]:!S.profile.grocery[v]};saveProfile();render()},
+  saveName(){const v=$('#nameIn').value.trim().slice(0,30);if(!v)return;S.profile.name=v;saveProfile();render()},
   askReset(){S.confirm='grocery';render()},
   cancelConfirm(){S.confirm=null;render()},
   resetGrocery(){S.profile.grocery={};S.confirm=null;saveProfile();render()},
@@ -724,7 +727,7 @@ document.addEventListener('change',ev=>{
   })}
   if(c==='kg'){const id=el.dataset.v;S.day.kg[id]=el.value;saveDay();if(el.value&&S.date>=((S.profile.lifts[id]||{}).date||'')){S.profile.lifts={...S.profile.lifts,[id]:{kg:el.value,date:S.date}};saveProfile()}}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight()});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight();if(ev.key==='Enter'&&ev.target.id==='nameIn')actions.saveName()});
 
 /* ---------- boot ---------- */
 (async()=>{
