@@ -188,6 +188,13 @@ body.timing .wrap{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))}
 .food-pick small{color:var(--muted);font-size:12.5px}
 .food-pick .k{font-weight:700}
 .qty{display:flex;align-items:center;gap:8px}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qa-b{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;text-align:left;display:grid;gap:1px}
+.qa-b b{font-weight:700;font-size:14px}
+.qa-b small{font-size:11.5px;color:var(--muted)}
+.scanv{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;background:#000}
+.aiimg{width:100%;max-height:220px;object-fit:cover;border-radius:10px}
+.btn[disabled]{opacity:.45}
 .qty button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:18px;font-weight:600}
 .qty input{width:80px!important;text-align:center}
 
@@ -284,6 +291,53 @@ const FOODS=[
  ['shawarma','Chicken shawarma wrap (est.)','1 wrap',550,32,50,24],
  ['mandi','Chicken mandi plate (est.)','1 plate',900,45,110,28],
  ['burger','Beef burger, no fries (est.)','1 burger',600,32,45,32],
+ ['karak','Karak tea','1 cup',120,3,18,4],
+ ['acoffee','Arabic coffee (gahwa)','1 cup',5,0,1,0],
+ ['machboos','Chicken machboos plate (est.)','1 plate',750,40,90,24],
+ ['lmandi','Lamb mandi plate (est.)','1 plate',1000,50,110,38],
+ ['biryani','Chicken biryani plate (est.)','1 plate',800,38,95,28],
+ ['harees','Harees','1 bowl',350,20,40,12],
+ ['tawook','Shish tawook plate with rice (est.)','1 plate',700,50,75,20],
+ ['mixgrill','Mixed grill plate, no rice (est.)','1 plate',900,70,10,60],
+ ['tikka','Chicken tikka','100 g',150,25,3,4],
+ ['kofta','Grilled kofta','100 g',250,18,3,18],
+ ['hammour','Grilled fish (hammour)','100 g',110,23,0,1.5],
+ ['shrimp','Shrimp (cooked)','100 g',99,24,0.2,0.3],
+ ['falafel','Falafel','1 piece',57,2.3,5.4,3],
+ ['falsand','Falafel sandwich (est.)','1 sandwich',450,14,55,18],
+ ['manzaatar','Manakish zaatar (est.)','1 piece',450,10,55,21],
+ ['mancheese','Manakish cheese (est.)','1 piece',550,20,55,27],
+ ['fatayer','Spinach fatayer','1 piece',150,4,20,6],
+ ['fattoush','Fattoush','1 bowl',180,3,20,10],
+ ['tabbouleh','Tabbouleh','1 bowl',150,3,15,9],
+ ['mutabbal','Mutabbal','2 tbsp',70,1.5,4,5.5],
+ ['lentsoup','Lentil soup','1 cup',180,10,28,3],
+ ['samosa','Samosa','1 piece',130,3,15,7],
+ ['luqaimat','Luqaimat (est.)','5 pieces',300,3,40,14],
+ ['kunafa','Kunafa (est.)','1 piece',450,10,50,24],
+ ['baklava','Baklava','1 piece',230,3,28,12],
+ ['pizza','Pizza, cheese','1 slice',280,12,33,11],
+ ['fries','French fries','medium',340,4,44,16],
+ ['friedchk','Fried chicken (est.)','1 piece',300,22,10,19],
+ ['nuggets','Chicken nuggets','6 pieces',270,14,16,17],
+ ['sushi','California roll','8 pieces',255,9,38,7],
+ ['indomie','Instant noodles','1 pack',380,8,52,16],
+ ['croissant','Croissant','1 piece',230,5,26,12],
+ ['muffin','Muffin','1 piece',420,6,55,20],
+ ['donut','Glazed donut','1 piece',260,3,31,14],
+ ['icecream','Ice cream','1 scoop',140,2.4,16,7],
+ ['latte','Latte, whole milk','medium',190,10,15,10],
+ ['icedcoffee','Sweet iced coffee (est.)','medium',250,6,40,7],
+ ['cola','Cola','330 ml',140,0,35,0],
+ ['mangojuice','Fresh mango juice','300 ml',180,1,44,0.5],
+ ['mango','Mango','1 fruit',200,2.8,50,1.3],
+ ['watermelon','Watermelon','1 cup',46,1,12,0.2],
+ ['grapes','Grapes','100 g',69,0.7,18,0.2],
+ ['pomegranate','Pomegranate','½ fruit',117,2.4,26,1.7],
+ ['cornflakes','Corn flakes','30 g',110,2,25,0.3],
+ ['kiri','Cream cheese triangle','1 piece',45,2,1,3.8],
+ ['chips','Potato chips','45 g bag',240,3,24,15],
+ ['choco','Chocolate bar (Snickers-type)','50 g',245,4,31,12],
 ].map(([id,n,u,k,p,c,f])=>({id,n,u,k,p,c,f}));
 
 /* ---------- meal plan ---------- */
@@ -856,37 +910,209 @@ function viewShop(){
 }
 
 /* ---------- add-food sheet ---------- */
+// Amount-based foods ("100 g", "250 ml") are entered in grams/ml; everything else in servings.
+const amtInfo=f=>{const m=/^(\d+(?:\.\d+)?)\s*(g|ml)$/.exec(f.u||'');return m?{base:+m[1],unit:m[2]}:null};
+const OFF='https://world.openfoodfacts.org';
+const SDK_URL='https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.2.0/+esm';
+const ZXING_URL='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+const KEY_LS='gymbro-apikey'; // kept outside the gymbro: prefix so backups never include it
+const getKey=()=>{try{return localStorage.getItem(KEY_LS)||''}catch(e){return ''}};
+const loadScript=src=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load'));document.head.appendChild(s)});
+function offToFood(p){
+  const n=p.nutriments||{},k=n['energy-kcal_100g']??(n['energy_100g']!=null?n['energy_100g']/4.184:null);
+  if(k==null)return null;
+  const name=(p.product_name||'Unnamed product').trim(),brand=Array.isArray(p.brands)?p.brands[0]:(p.brands||'').split(',')[0];
+  return{id:'off-'+(p.code||uid()),n:name+(brand?' · '+brand.trim():''),u:'100 g',k:r0(k),p:r1(n.proteins_100g||0),c:r1(n.carbohydrates_100g||0),f:r1(n.fat_100g||0),custom:true,src:'off',serving:p.serving_quantity?Number(p.serving_quantity):null};
+}
+async function getJSON(url){const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),15000);try{const r=await fetch(url,{signal:ctl.signal});if(!r.ok&&r.status!==404)throw new Error('http');return await r.json()}finally{clearTimeout(t)}}
+async function searchOnline(q){
+  const sh=S.sheet;Object.assign(sh,{mode:'online',busy:true,results:[],err:''});renderSheet();
+  try{
+    const d=await getJSON(`${OFF}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=code,product_name,brands,nutriments,serving_quantity`);
+    sh.results=(d.products||[]).map(offToFood).filter(Boolean);
+    if(!sh.results.length)sh.err='No products found. Try other words, scan the barcode, or use Quick add.';
+  }catch(e){sh.err='Online search needs internet and is not available in this view. Use Quick add instead.'}
+  sh.busy=false;if(S.sheet===sh)renderSheet();
+}
+async function lookupBarcode(code){
+  const sh=S.sheet;if(!sh)return;code=String(code).replace(/\D/g,'');if(code.length<8){sh.err='Barcodes have 8 to 13 digits.';renderSheet();return}
+  Object.assign(sh,{mode:'online',busy:true,results:[],err:''});renderSheet();
+  try{
+    const d=await getJSON(`${OFF}/api/v2/product/${code}?fields=code,product_name,brands,nutriments,serving_quantity`);
+    const f=d.status===1?offToFood({...d.product,code}):null;
+    if(f){sh.busy=false;openPick(f);return}
+    sh.err=`Barcode ${code} is not in the database yet. Use + New food with the numbers from the label.`;
+  }catch(e){sh.err='Barcode lookup needs internet. Try again when you are online, or use Quick add.'}
+  sh.busy=false;if(S.sheet===sh)renderSheet();
+}
+function openPick(f){
+  const sh=S.sheet;sh.temp=foodById(f.id)?null:f;
+  const a=amtInfo(f);Object.assign(sh,{mode:'pick',fid:f.id,qty:a?(f.serving||a.base)/a.base:1,err:''});renderSheet();
+}
+const pickedFood=()=>S.sheet.temp&&S.sheet.temp.id===S.sheet.fid?S.sheet.temp:foodById(S.sheet.fid);
+function rememberRecent(fid){S.profile.recent=[fid,...(S.profile.recent||[]).filter(x=>x!==fid)].slice(0,12)}
+
+/* barcode camera (ZXing, loaded on first use) */
+const Scan={reader:null,hit:false};
+async function startScan(){
+  const st=()=>$('#scanStatus');Scan.hit=false;
+  try{
+    if(!window.ZXing)await loadScript(ZXING_URL);
+    const hints=new Map();hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);
+    Scan.reader=new ZXing.BrowserMultiFormatReader(hints);
+    const v=$('#scanVideo');if(!v)return;v.setAttribute('playsinline','');v.muted=true;
+    await Scan.reader.decodeFromConstraints({video:{facingMode:'environment'}},v,res=>{if(res&&!Scan.hit){Scan.hit=true;const code=res.getText();stopScan();lookupBarcode(code)}});
+    st()&&(st().textContent='Point the camera at the barcode.');
+  }catch(e){stopScan();st()&&(st().textContent='The camera is not available here. Type the barcode number below.')}
+}
+function stopScan(){try{Scan.reader&&Scan.reader.reset()}catch(e){}Scan.reader=null}
+
+/* AI meal photo: Claude estimates items, grams and macros */
+const AI_SCHEMA={type:'object',properties:{items:{type:'array',items:{type:'object',properties:{name:{type:'string'},grams:{type:'number'},kcal:{type:'number'},protein:{type:'number'},carbs:{type:'number'},fat:{type:'number'},confidence:{type:'string',enum:['low','medium','high']}},required:['name','grams','kcal','protein','carbs','fat','confidence'],additionalProperties:false}},note:{type:'string'}},required:['items','note'],additionalProperties:false};
+const aiPrompt=note=>`You estimate nutrition from a meal photo for a man on a lean bulk in the UAE.
+List every distinct food and drink you can see as a separate item. Estimate each portion in grams (ml for drinks) from visual cues such as plate size (about 27 cm), cutlery, hands and packaging. Give calories, protein, carbs and fat for that portion, including visible oil, butter, sauces and dressings. When a dish looks like a typical UAE or Middle Eastern restaurant dish (machboos, mandi, shawarma, mixed grill and so on), use typical restaurant preparation. If you can read a nutrition label or a packaged product, use its numbers. Set confidence per item. In "note", say in one or two short sentences what you assumed (for example hidden oil, portion size) or why there are no items if the photo is not food.${note?`\nThe user adds: "${note.slice(0,300)}"`:''}`;
+const blobToB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(b)});
+async function aiBackend(){
+  if(window.claude&&window.claude.use){try{const s=await window.claude.use('sample');const caps=s&&await s.limits().catch(()=>null);if(caps&&caps.images)return{type:'claude',s}}catch(e){}}
+  return getKey()?{type:'key'}:null;
+}
+async function analyzeMeal(blob,note){
+  const be=await aiBackend();
+  if(!be)throw{msg:'Add your API key first.',setup:true};
+  if(be.type==='claude'){
+    try{return await be.s.json(aiPrompt(note)+`\nReply with JSON only: {"items":[{"name":string,"grams":number,"kcal":number,"protein":number,"carbs":number,"fat":number,"confidence":"low"|"medium"|"high"}],"note":string}`,{images:[blob],modelTier:'default',cache:false})}
+    catch(e){throw{msg:e&&e.code==='not_granted'?'Allow this page to use Claude, then try again.':e&&e.code==='rate_limited'?'Too many scans in a short time. Wait a minute and try again.':'Claude could not read that photo. Try again or take a clearer picture.'}}
+  }
+  const {default:Anthropic}=await import(SDK_URL).catch(()=>{throw{msg:'The AI scan needs internet. Connect and try again.'}});
+  const client=new Anthropic({apiKey:getKey(),dangerouslyAllowBrowser:true});
+  let res;
+  try{
+    res=await client.beta.messages.create({
+      model:'claude-opus-5-5',max_tokens:16000,
+      betas:['server-side-fallback-2026-07-01'],fallbacks:'default',
+      output_config:{effort:'low',format:{type:'json_schema',schema:AI_SCHEMA}},
+      messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:await blobToB64(blob)}},{type:'text',text:aiPrompt(note)}]}],
+    });
+  }catch(e){
+    if(e instanceof Anthropic.AuthenticationError)throw{msg:'Your API key was rejected. Check it in the AI key settings.',setup:true};
+    if(e instanceof Anthropic.RateLimitError)throw{msg:'Too many requests right now. Wait a minute and try again.'};
+    if(e instanceof Anthropic.APIConnectionError)throw{msg:'Could not reach the AI service. Check your internet and try again.'};
+    if(e instanceof Anthropic.APIError)throw{msg:e.type==='billing_error'||/credit/i.test(e.message||'')?'Your Anthropic account is out of credit. Add credit at console.anthropic.com → Billing.':'The AI service returned an error ('+(e.status||'?')+'). Try again.'};
+    throw{msg:'Something went wrong. Try again.'};
+  }
+  if(res.stop_reason==='refusal')throw{msg:'The AI declined this photo. Try a photo of just the food.'};
+  if(res.stop_reason==='max_tokens')throw{msg:'The answer was cut off. Try again.'};
+  try{return JSON.parse(res.content.filter(b=>b.type==='text').map(b=>b.text).join(''))}catch(e){throw{msg:'The AI answer could not be read. Try again.'}}
+}
+async function runAI(file){
+  const sh=S.sheet;if(!sh)return;
+  Object.assign(sh,{mode:'ai',ai:{step:'busy',preview:null,items:[],note:''},err:''});
+  try{
+    const blob=await shrinkImage(file);sh.ai.preview=URL.createObjectURL(blob);renderSheet();
+    const out=await analyzeMeal(blob,($('#aiNote')||{}).value||sh.aiNote||'');
+    sh.ai.items=(out.items||[]).filter(i=>i&&i.name).map(i=>({...i,on:true,base:{g:Math.max(1,+i.grams||100),k:+i.kcal||0,p:+i.protein||0,c:+i.carbs||0,f:+i.fat||0}}));
+    sh.ai.note=out.note||'';sh.ai.step='review';
+  }catch(e){sh.ai.step='error';sh.err=(e&&e.msg)||'Something went wrong. Try again.';if(e&&e.setup)sh.ai.needKey=true}
+  if(S.sheet===sh)renderSheet();
+}
+const aiScaled=it=>{const r=(+it.grams||0)/it.base.g;return{k:r0(it.base.k*r),p:r1(it.base.p*r),c:r1(it.base.c*r),f:r1(it.base.f*r)}};
+
+function sheetHome(){
+  const sh=S.sheet,q=(sh.q||'').toLowerCase().trim();
+  const all=[...(S.profile.customFoods||[]),...FOODS];
+  const recent=(S.profile.recent||[]).map(foodById).filter(Boolean);
+  const list=q?all.filter(f=>f.n.toLowerCase().includes(q)):all;
+  const row=f=>`<button class="food-pick" data-a="pickFood" data-v="${esc(f.id)}"><span class="t"><b>${esc(f.n)}${f.custom?` <span class="chip" style="padding:1px 7px;font-size:10px">${f.src==='off'?'online':'mine'}</span>`:''}</b><small class="num">${esc(f.u)} · P ${f.p} · C ${f.c} · F ${f.f}</small></span><span class="k num">${f.k}</span></button>`;
+  return `
+    <div class="qa">
+      <button class="qa-b" data-a="aiMode"><b>AI meal photo</b><small>Snap your plate</small></button>
+      <button class="qa-b" data-a="scanMode"><b>Scan barcode</b><small>Packaged food</small></button>
+      <button class="qa-b" data-a="quickMode"><b>Quick add</b><small>Just kcal + protein</small></button>
+      <button class="qa-b" data-a="customMode"><b>New food</b><small>From a label</small></button>
+    </div>
+    ${sh.err?`<p style="color:var(--prot);font-size:13px;padding-top:10px">${esc(sh.err)}</p>`:''}
+    ${q.length>=2?`<button class="btn ghost full" style="margin-top:10px" data-a="searchOnline">Search "${esc(sh.q.trim())}" online</button>`:''}
+    ${!q&&recent.length?`<div class="eyebrow" style="padding-top:14px">Recent</div>${recent.map(row).join('')}`:''}
+    <div class="eyebrow" style="padding-top:14px">${q?'Matches':'All foods'}</div>
+    ${list.map(row).join('')||'<p class="muted" style="padding:10px 0">Nothing saved matches. Search online, or use Quick add.</p>'}
+    <p class="muted" style="font-size:12.5px;padding-top:12px">Eating out? Most UAE restaurants and delivery apps show calories on the menu. Use Quick add with those numbers, or take an AI photo.</p>`;
+}
+function sheetPick(){
+  const sh=S.sheet,f=pickedFood(),a=amtInfo(f),q=Number(sh.qty)||0;
+  return `<div class="card"><div><b style="font-size:17px">${esc(f.n)}</b><p class="muted">${esc(f.u)} = ${f.k} kcal · P ${f.p} · C ${f.c} · F ${f.f}</p></div>
+    <div class="row between"><div class="qty"><button data-a="qty" data-v="-1" aria-label="Less">−</button>${a
+      ?`<input id="amtIn" type="number" inputmode="decimal" step="1" min="1" value="${r0(q*a.base)}" data-c="amt" aria-label="Amount in ${a.unit}">`
+      :`<input id="qtyIn" type="number" inputmode="decimal" step="0.25" min="0.25" value="${q}" data-c="qty" aria-label="Servings">`}<button data-a="qty" data-v="1" aria-label="More">+</button></div><span class="muted">${a?a.unit+' eaten':'servings'}</span></div>
+    <p class="num" style="font-weight:600">${r0(f.k*q)} kcal · P ${r0(f.p*q)} · C ${r0(f.c*q)} · F ${r0(f.f*q)}</p>
+    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="addFood">Add to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div></div>`;
+}
+function sheetOnline(){
+  const sh=S.sheet;
+  return `<div class="row between" style="padding:4px 0 6px"><button class="btn ghost sm" data-a="sheetBack">Back</button><span class="muted" style="font-size:12px">Open Food Facts · per 100 g</span></div>
+    ${sh.busy?'<p class="muted" style="padding:14px 0">Searching…</p>':''}
+    ${sh.err?`<p style="color:var(--prot);font-size:13px;padding:8px 0">${esc(sh.err)}</p>`:''}
+    ${(sh.results||[]).map(f=>`<button class="food-pick" data-a="pickOnline" data-v="${esc(f.id)}"><span class="t"><b>${esc(f.n)}</b><small class="num">100 g · P ${f.p} · C ${f.c} · F ${f.f}</small></span><span class="k num">${f.k}</span></button>`).join('')}`;
+}
+function sheetQuick(){
+  const sh=S.sheet;
+  return `<div class="card"><b>Quick add</b><p class="muted" style="font-size:13px">For restaurant food or anything you only know the calories of. Protein matters most for your bulk.</p>
+    <label class="f">What was it?<input id="qkN" type="text" placeholder="e.g. Shawarma plate, Al Mallah"></label>
+    <div class="grid2"><label class="f">kcal<input id="qkK" type="number" inputmode="decimal"></label><label class="f">Protein g<input id="qkP" type="number" inputmode="decimal"></label><label class="f">Carbs g (optional)<input id="qkC" type="number" inputmode="decimal"></label><label class="f">Fat g (optional)<input id="qkF" type="number" inputmode="decimal"></label></div>
+    ${sh.err?`<p style="color:var(--prot);font-size:13px">${esc(sh.err)}</p>`:''}
+    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="saveQuick">Add to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div></div>`;
+}
+function sheetScan(){
+  return `<div class="card"><div class="row between"><b>Scan barcode</b><button class="btn ghost sm" data-a="sheetBack">Back</button></div>
+    <video id="scanVideo" class="scanv" playsinline muted autoplay></video>
+    <p id="scanStatus" class="muted" style="font-size:13px">Starting the camera…</p>
+    <div class="row"><input id="bcIn" type="text" inputmode="numeric" placeholder="Or type the barcode number"><button class="btn" data-a="lookupBc">Look up</button></div></div>`;
+}
+function sheetAI(){
+  const sh=S.sheet,ai=sh.ai||{step:'start'},key=getKey();
+  if(ai.step==='key'||ai.needKey&&!key)return `<div class="card"><div class="row between"><b>AI key</b><button class="btn ghost sm" data-a="aiMode">Back</button></div>
+    <p style="font-size:13.5px">In this app, the photo scan uses Claude through your own Anthropic API key. It costs about 1–3 US cents per photo, billed to your Anthropic account.</p>
+    <ol class="clean" style="font-size:13.5px"><li>Open <b>console.anthropic.com</b> on any device and sign up.</li><li>Go to <b>Billing</b> and add credit ($5 is hundreds of scans).</li><li>Go to <b>API keys</b> → <b>Create key</b>, copy it.</li><li>Paste it below.</li></ol>
+    <label class="f">API key<input id="keyIn" type="password" autocomplete="off" placeholder="sk-ant-…" value=""></label>
+    ${sh.err?`<p style="color:var(--prot);font-size:13px">${esc(sh.err)}</p>`:''}
+    <div class="row"><button class="btn" style="flex:1" data-a="saveKey">Save key</button>${key?`<button class="btn ghost" data-a="delKey">Remove key</button>`:''}</div>
+    <p class="muted" style="font-size:12px">The key is saved on this phone only and is not in your backup file. Never share it or post it anywhere.</p></div>`;
+  if(ai.step==='busy')return `<div class="card">${ai.preview?`<img class="aiimg" src="${ai.preview}" alt="Your meal">`:''}<p style="font-weight:600">Looking at your meal…</p><p class="muted" style="font-size:13px">Usually 5–20 seconds.</p></div>`;
+  if(ai.step==='review'){
+    const on=ai.items.filter(i=>i.on),tot=on.reduce((a,i)=>{const s=aiScaled(i);a.k+=s.k;a.p+=s.p;a.c+=s.c;a.f+=s.f;return a},{k:0,p:0,c:0,f:0});
+    return `<div class="card">${ai.preview?`<img class="aiimg" src="${ai.preview}" alt="Your meal">`:''}
+      <div class="row between"><b>Found ${ai.items.length} item${ai.items.length===1?'':'s'}</b><span class="num" style="font-weight:700">${r0(tot.k)} kcal · P ${r0(tot.p)}</span></div>
+      ${ai.note?`<p class="muted" style="font-size:12.5px">${esc(ai.note)}</p>`:''}
+      <div class="list">${ai.items.map((it,i)=>{const s=aiScaled(it);return `<div class="li"><button class="check ${it.on?'on':''}" data-a="aiToggle" data-v="${i}" aria-label="Include ${esc(it.name)}"></button><div class="t"><b>${esc(it.name)}${it.confidence==='low'?' <span class="chip warn" style="padding:1px 7px;font-size:10px">unsure</span>':''}</b><small class="num">${s.k} kcal · P ${s.p} · C ${s.c} · F ${s.f}</small></div><input id="aig-${i}" type="number" inputmode="decimal" class="kg" style="width:74px!important" value="${r0(+it.grams||0)}" data-c="aig" data-v="${i}" aria-label="${esc(it.name)} grams"><span class="muted" style="font-size:12px">g</span></div>`}).join('')}</div>
+      <p class="muted" style="font-size:12px">These are AI estimates. Fix the grams if you know better; untick anything that isn't yours.</p>
+      <div class="row"><label class="btn ghost" for="aiFile">Retake</label><button class="btn" style="flex:1" data-a="aiAdd" ${on.length?'':'disabled'}>Add ${on.length} to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div>
+      <input id="aiFile" type="file" accept="image/*" capture="environment" data-c="aiFile" hidden></div>`;
+  }
+  return `<div class="card"><div class="row between"><b>AI meal photo</b><button class="btn ghost sm" data-a="sheetBack">Back</button></div>
+    <p class="muted" style="font-size:13px">Take a photo from above with the whole plate in view. Claude names each item and estimates grams, calories and protein. You check it before it's added.</p>
+    <label class="f">Anything the photo can't show? (optional)<input id="aiNote" type="text" placeholder="e.g. fried in butter, 2 pieces, large size" value="${esc(sh.aiNote||'')}" data-c="aiNote"></label>
+    ${sh.err?`<p style="color:var(--prot);font-size:13px">${esc(sh.err)}</p>`:''}
+    <label class="btn full" for="aiFile" style="text-align:center">Take or choose a photo</label>
+    <input id="aiFile" type="file" accept="image/*" capture="environment" data-c="aiFile" hidden>
+    <button class="btn ghost sm" style="justify-self:start" data-a="aiKey">${key?'AI key settings':'Set up AI key'}</button></div>`;
+}
 function renderSheet(){
   const el=$('#sheet');
   if(!S.sheet){el.innerHTML='';return}
   const sh=S.sheet,type=dayType(S.date);
   const meals=MEALS.filter(m=>!(m.train&&type!=='train'));
   if(!sh.meal)sh.meal=meals[0].id;
-  let body;
-  if(sh.mode==='pick'){
-    const f=foodById(sh.fid),q=sh.qty;
-    body=`<div class="card"><div><b style="font-size:17px">${esc(f.n)}</b><p class="muted">${esc(f.u)} = ${f.k} kcal · P ${f.p} · C ${f.c} · F ${f.f}</p></div>
-      <div class="row between"><div class="qty"><button data-a="qty" data-v="-0.5" aria-label="Less">−</button><input id="qtyIn" type="number" inputmode="decimal" step="0.25" min="0.25" value="${q}" data-c="qty" aria-label="Servings"><button data-a="qty" data-v="0.5" aria-label="More">+</button></div><span class="muted">servings</span></div>
-      <p class="num" style="font-weight:600">${r0(f.k*q)} kcal · P ${r0(f.p*q)} · C ${r0(f.c*q)} · F ${r0(f.f*q)}</p>
-      <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="addFood">Add to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div></div>`;
-  }else if(sh.mode==='custom'){
-    body=`<div class="card"><b>New food</b>
+  const custom=()=>`<div class="card"><b>New food</b>
       <label class="f">Name<input id="cfN" type="text" placeholder="e.g. Mum's machboos"></label>
-      <label class="f">Serving<input id="cfU" type="text" placeholder="e.g. 1 plate, 100 g"></label>
+      <label class="f">Serving (use "100 g" when copying a label)<input id="cfU" type="text" placeholder="e.g. 100 g, 1 plate"></label>
       <div class="grid2"><label class="f">kcal<input id="cfK" type="number" inputmode="decimal"></label><label class="f">Protein g<input id="cfP" type="number" inputmode="decimal"></label><label class="f">Carbs g<input id="cfC" type="number" inputmode="decimal"></label><label class="f">Fat g<input id="cfF" type="number" inputmode="decimal"></label></div>
       ${sh.err?`<p style="color:var(--prot);font-size:13px">${esc(sh.err)}</p>`:''}
       <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="saveCustom">Save food</button></div></div>`;
-  }else{
-    const q=(sh.q||'').toLowerCase().trim();
-    const list=[...(S.profile.customFoods||[]),...FOODS].filter(f=>!q||f.n.toLowerCase().includes(q));
-    body=`${list.map(f=>`<button class="food-pick" data-a="pickFood" data-v="${f.id}"><span class="t"><b>${esc(f.n)}${f.custom?' <span class="chip" style="padding:1px 7px;font-size:10px">mine</span>':''}</b><small class="num">${esc(f.u)} · P ${f.p} · C ${f.c} · F ${f.f}</small></span><span class="k num">${f.k}</span></button>`).join('')||'<p class="muted" style="padding:12px 0">No match. Add it as your own food.</p>'}
-      <button class="btn ghost full" style="margin-top:12px" data-a="customMode">+ Create your own food</button>`;
-  }
+  const body={pick:sheetPick,custom,online:sheetOnline,quick:sheetQuick,scan:sheetScan,ai:sheetAI}[sh.mode]||sheetHome;
   el.innerHTML=`<div class="sheet-bg" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Add food">
     <div class="sh"><div class="row between"><h3>Add food</h3><button class="x" data-a="closeSheet" aria-label="Close">×</button></div>
       <div class="tabs-inline">${meals.map(m=>`<button class="${m.id===sh.meal?'on':''}" data-a="sheetMeal" data-v="${m.id}">${esc(m.n)}</button>`).join('')}</div>
-      ${sh.mode==='search'?`<input id="foodSearch" type="search" placeholder="Search ${FOODS.length}+ foods" value="${esc(sh.q||'')}" data-c="search" autocomplete="off">`:''}</div>
-    <div></div><div class="sb">${body}</div></div></div>`;
+      ${sh.mode==='search'?`<input id="foodSearch" type="search" placeholder="Search foods" value="${esc(sh.q||'')}" data-c="search" autocomplete="off" enterkeyhint="search">`:''}</div>
+    <div></div><div class="sb">${body()}</div></div></div>`;
 }
 
 /* ---------- render ---------- */
@@ -962,13 +1188,38 @@ const actions={
   },
   unlogPlan(v){const m=MEALS.find(x=>x.id===v),type=dayType(S.date);S.day.foods=S.day.foods.filter(e=>!isPlanEntry(e,m,type));saveDay();render()},
   openAdd(v){S.sheet={mode:'search',meal:v||suggestMeal(),q:'',qty:1};renderSheet();setTimeout(()=>{const i=$('#foodSearch');if(i&&matchMedia('(hover:hover)').matches)i.focus()},50)},
-  closeSheet(v,el,ev){if(ev.target!==el)return;S.sheet=null;renderSheet()},
+  closeSheet(v,el,ev){if(ev.target!==el)return;stopScan();S.sheet=null;renderSheet()},
   sheetMeal(v){S.sheet.meal=v;renderSheet()},
-  pickFood(v){Object.assign(S.sheet,{mode:'pick',fid:v,qty:1});renderSheet()},
-  sheetBack(){S.sheet.mode='search';S.sheet.err='';renderSheet()},
-  customMode(){S.sheet.mode='custom';renderSheet()},
-  qty(v){S.sheet.qty=Math.max(0.25,Math.round((Number(S.sheet.qty)+Number(v))*4)/4);renderSheet()},
-  addFood(){const sh=S.sheet;S.day.foods.push(entryFrom(foodById(sh.fid),Number(sh.qty)||1,sh.meal));saveDay();S.sheet=null;render()},
+  pickFood(v){openPick(foodById(v))},
+  pickOnline(v){openPick(S.sheet.results.find(f=>f.id===v))},
+  sheetBack(){stopScan();Object.assign(S.sheet,{mode:'search',err:'',temp:null});renderSheet()},
+  customMode(){S.sheet.mode='custom';S.sheet.err='';renderSheet()},
+  quickMode(){S.sheet.mode='quick';S.sheet.err='';renderSheet()},
+  scanMode(){S.sheet.mode='scan';S.sheet.err='';renderSheet();startScan()},
+  lookupBc(){const v=($('#bcIn')||{}).value||'';stopScan();lookupBarcode(v)},
+  searchOnline(){searchOnline(S.sheet.q.trim())},
+  aiMode(){Object.assign(S.sheet,{mode:'ai',ai:{step:'start'},err:''});renderSheet()},
+  aiKey(){Object.assign(S.sheet,{mode:'ai',ai:{step:'key'},err:''});renderSheet()},
+  saveKey(){const k=($('#keyIn').value||'').trim();if(!/^sk-ant-/.test(k)){S.sheet.err='That does not look like an Anthropic key. It starts with sk-ant-.';renderSheet();return}try{localStorage.setItem(KEY_LS,k)}catch(e){}Object.assign(S.sheet,{ai:{step:'start'},err:''});renderSheet()},
+  delKey(){try{localStorage.removeItem(KEY_LS)}catch(e){}Object.assign(S.sheet,{ai:{step:'key'},err:''});renderSheet()},
+  aiToggle(v){const it=S.sheet.ai.items[+v];it.on=!it.on;renderSheet()},
+  aiAdd(){
+    const sh=S.sheet;sh.ai.items.filter(i=>i.on).forEach(it=>{const s=aiScaled(it);S.day.foods.push({id:uid(),fid:'ai',name:it.name,unit:r0(+it.grams||0)+' g (AI)',meal:sh.meal,qty:1,kcal:s.k,p:s.p,c:s.c,f:s.f})});
+    saveDay();S.sheet=null;render();
+  },
+  saveQuick(){
+    const g=id=>Number($(id).value)||0,k=g('#qkK');
+    if(!k){S.sheet.err='Enter the calories at least.';renderSheet();return}
+    S.day.foods.push({id:uid(),fid:'quick',name:$('#qkN').value.trim()||'Quick add',unit:'quick add',meal:S.sheet.meal,qty:1,kcal:r0(k),p:r1(g('#qkP')),c:r1(g('#qkC')),f:r1(g('#qkF'))});
+    saveDay();S.sheet=null;render();
+  },
+  qty(v){const sh=S.sheet,a=amtInfo(pickedFood());sh.qty=a?Math.max(1/a.base,((Number(sh.qty)||0)*a.base+Number(v)*(a.unit==='ml'?25:10))/a.base):Math.max(0.25,Math.round(((Number(sh.qty)||0)+Number(v)*0.5)*4)/4);renderSheet()},
+  addFood(){
+    const sh=S.sheet,f=pickedFood();
+    if(sh.temp&&sh.temp.id===f.id&&!foodById(f.id)){const {serving,...keep}=f;S.profile.customFoods=[keep,...(S.profile.customFoods||[])].slice(0,300)}
+    rememberRecent(f.id);saveProfile();
+    S.day.foods.push(entryFrom(f,Number(sh.qty)||1,sh.meal));saveDay();S.sheet=null;render();
+  },
   saveCustom(){
     const g=id=>$(id).value.trim(),n=g('#cfN'),u=g('#cfU')||'1 serving',k=Number(g('#cfK'));
     if(!n||!k){S.sheet.err='Add at least a name and calories.';renderSheet();return}
@@ -1006,10 +1257,14 @@ document.addEventListener('input',ev=>{
   const el=ev.target,c=el.dataset.c;
   if(c==='search'){S.sheet.q=el.value;clearTimeout(searchT);searchT=setTimeout(()=>{const pos=el.selectionStart;renderSheet();const i=$('#foodSearch');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}},120)}
   if(c==='qty'){S.sheet.qty=Number(el.value)||0}
+  if(c==='aiNote'){S.sheet.aiNote=el.value}
 });
 document.addEventListener('change',ev=>{
   const el=ev.target,c=el.dataset.c;
   if(c==='qty'){S.sheet.qty=Math.max(0.25,Number(el.value)||1);renderSheet()}
+  if(c==='amt'){const a=amtInfo(pickedFood());S.sheet.qty=Math.max(1,Number(el.value)||a.base)/a.base;renderSheet()}
+  if(c==='aig'){const it=S.sheet.ai.items[+el.dataset.v];it.grams=Math.max(0,Number(el.value)||0);renderSheet()}
+  if(c==='aiFile'&&el.files[0])runAI(el.files[0]);
   if(c==='sleep'){S.day.sleep=el.value;saveDay()}
   if(c==='cmpA'||c==='cmpB'){S[c]=el.value;render()}
   if(c==='photo'&&el.files[0]){const pose=el.dataset.v,date=S.date,file=el.files[0];(async()=>{
@@ -1026,7 +1281,7 @@ document.addEventListener('change',ev=>{
   })}
   if(c==='kg'||c==='reps'){const id=el.dataset.v;S.day[c]={...(S.day[c]||{}),[id]:el.value};saveDay();logLift(id)}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight();if(ev.key==='Enter'&&ev.target.id==='nameIn')actions.saveName()});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan();S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='foodSearch'&&S.sheet&&(S.sheet.q||'').trim().length>=2)searchOnline(S.sheet.q.trim());if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight();if(ev.key==='Enter'&&ev.target.id==='nameIn')actions.saveName()});
 
 /* ---------- boot ---------- */
 (async()=>{
