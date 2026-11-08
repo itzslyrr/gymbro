@@ -567,7 +567,7 @@ function viewToday(){
         <div class="c"><b class="num">${r0(tot.k)}</b><span>of ${t.kcal} kcal</span></div></div>
       <div class="macros">${macroBar('Protein','--prot',tot.p,t.p)}${macroBar('Carbs','--carb',tot.c,t.c)}${macroBar('Fat','--fat',tot.f,t.f)}</div>
     </div>
-    <button class="btn full" data-a="openAdd" data-v="">Log food</button>
+    <div class="grid2"><button class="btn" data-a="openAdd" data-v="">Log food</button><button class="btn ghost" data-a="openAI">AI meal photo</button></div>
   </section>
 
   ${S.date===TODAY&&(dueFor('photos')||dueFor('body'))?`<section class="card"><div class="row between"><h3>Check-in due</h3><span class="chip warn">every 2 weeks</span></div><div class="row">${dueFor('photos')?`<button class="btn ghost sm" data-a="goProg" data-v="photos">Progress photos</button>`:''}${dueFor('body')?`<button class="btn ghost sm" data-a="goProg" data-v="body">Measurements</button>`:''}</div></section>`:''}
@@ -596,7 +596,7 @@ function viewFood(){
   const plan=sumItems(MEALS.flatMap(m=>mealItems(m,type)));
   return `
   <section class="card">
-    <div class="row between"><div><div class="eyebrow">${type==='train'?'Training day':'Rest day'}</div><h2 class="num">${r0(tot.k)} / ${t.kcal} kcal</h2></div><button class="btn sm" data-a="openAdd" data-v="">+ Add</button></div>
+    <div class="row between"><div><div class="eyebrow">${type==='train'?'Training day':'Rest day'}</div><h2 class="num">${r0(tot.k)} / ${t.kcal} kcal</h2></div><div class="row" style="gap:6px"><button class="btn ghost sm" data-a="openAI">AI photo</button><button class="btn sm" data-a="openAdd" data-v="">+ Add</button></div></div>
     <div class="mm num">Protein <i style="color:var(--prot)">${r0(tot.p)}/${t.p}g</i> · Carbs <i style="color:var(--carb)">${r0(tot.c)}/${t.c}g</i> · Fat <i style="color:var(--fat)">${r0(tot.f)}/${t.f}g</i></div>
     <p class="muted" style="font-size:12.5px">The full plan below adds up to ${r0(plan.k)} kcal, ${r0(plan.p)}g protein, ${r0(plan.c)}g carbs, ${r0(plan.f)}g fat. Tap “Log plan” on a meal when you eat it as written.</p>
   </section>
@@ -1190,6 +1190,7 @@ const actions={
   openAdd(v){S.sheet={mode:'search',meal:v||suggestMeal(),q:'',qty:1};renderSheet();setTimeout(()=>{const i=$('#foodSearch');if(i&&matchMedia('(hover:hover)').matches)i.focus()},50)},
   closeSheet(v,el,ev){if(ev.target!==el)return;stopScan();S.sheet=null;renderSheet()},
   sheetMeal(v){S.sheet.meal=v;renderSheet()},
+  openAI(){S.sheet={mode:'ai',meal:suggestMeal(),q:'',qty:1,ai:{step:'start'},err:''};renderSheet()},
   pickFood(v){openPick(foodById(v))},
   pickOnline(v){openPick(S.sheet.results.find(f=>f.id===v))},
   sheetBack(){stopScan();Object.assign(S.sheet,{mode:'search',err:'',temp:null});renderSheet()},
@@ -1294,7 +1295,23 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
 })();
 </script>
 
+<style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#1E5BCB;color:#fff;box-shadow:0 8px 24px rgb(0 0 0 / .3)}.ver{font-size:11px;color:var(--muted);text-align:center;padding:2px 0 8px}</style>
 <script>
+const APP_VERSION='684b0b74bb';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+(()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('.wrap');w&&w.appendChild(v)})();
+async function checkUpdate(){
+  try{
+    const t=await (await fetch('./index.html?check='+Date.now(),{cache:'no-store'})).text();
+    const m=t.match(/APP_VERSION='([0-9a-f]+)'/);
+    if(m&&m[1]!==APP_VERSION&&!document.getElementById('upd')){
+      const b=document.createElement('button');b.id='upd';b.className='updbar';b.textContent='New version ready · Tap to update';
+      b.onclick=async()=>{try{const r=await navigator.serviceWorker.getRegistration();r&&await r.update()}catch(e){}location.reload()};
+      document.body.appendChild(b);
+    }
+  }catch(e){}
+}
+addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+setTimeout(checkUpdate,2500);
 </script>
 </body></html>
