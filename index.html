@@ -170,6 +170,20 @@ label.f{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .timer i{position:absolute;left:0;bottom:0;height:4px;background:var(--fat)}
 body.timing .wrap{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))}
 
+/* coach, streaks */
+.coach{display:grid;gap:1px;border-radius:10px;padding:8px 10px;background:var(--surface-2);font-size:13px}
+.coach b{font-size:14px}
+.coach span{color:var(--muted);font-size:12.5px}
+.coach.up{background:color-mix(in srgb,var(--kcal) 15%,transparent)}
+.coach.up b{color:var(--kcal)}
+.streaks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.streak{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;gap:0;min-width:0}
+.streak b{font-family:var(--display);font-size:30px;line-height:1}
+.streak span{font-size:12px;font-weight:600}
+.streak small{font-size:11px;color:var(--muted)}
+.streak.done{border-color:var(--kcal)}
+.streak.done small{color:var(--kcal);font-weight:600}
+
 /* food */
 .meal{display:grid;gap:6px}
 .meal .mh{display:flex;align-items:baseline;gap:8px}
@@ -509,17 +523,17 @@ function renderSync(){$('#sync').textContent=Cloud.ready?(Cloud.err?'Could not s
 /* ---------- state ---------- */
 let TODAY=ymd(new Date());
 // The app can stay open in the background overnight: roll 'today' forward when the date changes.
-function refreshToday(){const t=ymd(new Date());if(t===TODAY)return;const was=TODAY;TODAY=t;if(S.date===was)goDate(t);else render()}
+function refreshToday(){const t=ymd(new Date());if(t===TODAY)return;const was=TODAY;TODAY=t;S.repData=null;scheduleStreaks();if(S.date===was)goDate(t);else render()}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshToday()});
 setInterval(refreshToday,60000);
 const blankDay=()=>({foods:[],water:0,sets:{},kg:{},reps:{},routine:{},habits:{},supps:{},sleep:''});
 const blankProfile=()=>({weights:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},liftLog:{},calAdj:0});
-const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null,photos:null,progSub:null};
+const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null,photos:null,progSub:null,dayCache:{},streaks:null,repData:null};
 try{const t=localStorage.getItem(LS+'tab');if(t)S.tab=t}catch(e){}
 const dayKey=s=>'day-'+s;
-function saveDay(){save(dayKey(S.date),S.day)}
+function saveDay(){save(dayKey(S.date),S.day);S.dayCache[S.date]=S.day;S.repData=null;if(S.date===TODAY)scheduleStreaks()}
 function saveProfile(){save('profile',S.profile)}
-async function loadDay(){S.day=Object.assign(blankDay(),await load(dayKey(S.date))||{})}
+async function loadDay(){S.day=Object.assign(blankDay(),await load(dayKey(S.date))||{});S.dayCache[S.date]=S.day}
 async function loadProfile(){S.profile=Object.assign(blankProfile(),await load('profile')||{})}
 
 /* ---------- icons ---------- */
@@ -573,6 +587,10 @@ function viewToday(){
     </div>
     <div class="grid2"><button class="btn" data-a="openAdd" data-v="">Log food</button><button class="btn ghost" data-a="openAI">AI meal photo</button></div>
   </section>
+  ${viewStreaks()}
+  ${viewRamadanToday()}
+  ${viewProteinHelper()}
+  ${S.date===TODAY&&TODAY>=addDays(START,8)&&['rest2','push'].includes(planKey(TODAY))?`<section class="card"><div class="row between"><h3>Cycle report ready</h3><button class="btn sm" data-a="goProg" data-v="report">Open</button></div><p class="muted" style="font-size:13px">How your last 8 days went, and what to change for the next cycle.</p></section>`:''}
 
   ${S.date===TODAY&&(dueFor('photos')||dueFor('body'))?`<section class="card"><div class="row between"><h3>Check-in due</h3><span class="chip warn">every 2 weeks</span></div><div class="row">${dueFor('photos')?`<button class="btn ghost sm" data-a="goProg" data-v="photos">Progress photos</button>`:''}${dueFor('body')?`<button class="btn ghost sm" data-a="goProg" data-v="body">Measurements</button>`:''}</div></section>`:''}
   <section class="card">
@@ -595,6 +613,142 @@ function viewToday(){
   ${dayHasData()?viewMoveDay():''}`;
 }
 
+/* ---------- Ramadan mode: iftar → suhoor plan with the same calories ---------- */
+const MEALS_R=[
+ {id:'iftar',n:'Iftar',time:'sunset',items:[['date',3],['laban',1],['lentsoup',1]]},
+ {id:'main',n:'Main iftar meal',time:'+45 min',items:[['chicken',1.5],['rice',2.5],['oil',1],['salad',1]]},
+ {id:'rpre',n:'Pre-workout',time:'~21:00',train:true,items:[['ricecake',2],['pb',1]]},
+ {id:'rpost',n:'Post-workout',time:'~22:30',train:true,items:[['whey',1],['milk',1]]},
+ {id:'late',n:'Late meal',time:'~23:30',items:[['salmon',1.5],['sweetpot',2],['veg',1]],restExtra:[['avocado',1]]},
+ {id:'suhoor',n:'Suhoor',time:'before Fajr',items:[['oats',2],['milk',1],['egg',3],['banana',1],['gyog',1.5]]},
+ {id:'extra',n:'Extras',time:'any',items:[]},
+];
+// Estimated dates for Ramadan 1448; the UAE confirms them by moon sighting, so they are editable.
+const RAMADAN_DEFAULT={on:false,start:'2027-02-08',end:'2027-03-09'};
+const ramadan=()=>({...RAMADAN_DEFAULT,...(S.profile.ramadan||{})});
+const isRamadan=d=>{const r=ramadan();return r.on&&d>=r.start&&d<=r.end};
+const mealsFor=d=>isRamadan(d)?MEALS_R:MEALS;
+const mealName=id=>(mealsFor(S.date).find(m=>m.id===id)||{n:'Extras'}).n;
+function viewRamadanSetup(){
+  const r=ramadan();
+  return `<section class="card">
+    <div class="row between"><h3>Ramadan mode</h3><button class="btn sm ${r.on?'':'ghost'}" data-a="ramToggle" aria-pressed="${r.on}">${r.on?'On':'Off'}</button></div>
+    <p class="muted" style="font-size:13px">Between these dates the meal plan switches to iftar, late meal and suhoor with the same calories, training moves to after iftar, and water is spread between iftar and suhoor.</p>
+    <div class="grid2"><label class="f">Starts<input id="ramS" type="date" value="${r.start}" data-c="ramS"></label><label class="f">Ends<input id="ramE" type="date" value="${r.end}" data-c="ramE"></label></div>
+    <p class="muted" style="font-size:12px">The dates are estimates. Change them when the UAE announces the moon sighting.</p>
+  </section>`;
+}
+function viewRamadanToday(){
+  const r=ramadan();
+  if(isRamadan(S.date))return `<section class="card"><div class="row between"><h3>Ramadan Kareem</h3><span class="chip num">Day ${daysBetween(r.start,S.date)+1}</span></div>
+    <ul class="clean" style="font-size:13.5px"><li><b>Iftar:</b> 3 dates, 2 glasses of water, laban and soup. Main meal 45 minutes later.</li><li><b>Train</b> 1.5–2 hours after iftar, around 21:00.</li><li><b>Water:</b> 1 glass every hour from iftar to suhoor, plus 2 at suhoor.</li><li><b>Suhoor</b> as late as you can: slow carbs, eggs, yogurt.</li></ul></section>`;
+  const until=daysBetween(TODAY,r.start);
+  if(!r.on&&S.date===TODAY&&until>0&&until<=21)return `<section class="card"><div class="row between"><h3>Ramadan in ${until} day${until===1?'':'s'}</h3><button class="btn sm" data-a="ramToggle">Turn on</button></div><p class="muted" style="font-size:13px">Ramadan mode keeps your bulk going with an iftar-to-suhoor meal plan and training after iftar. Check the dates in the Food tab.</p></section>`;
+  return '';
+}
+
+/* ---------- next-weight coach (double progression) ---------- */
+const SMALL_LIFTS=new Set(['latr','latr2','fpull','curl','hammer','incurl','kitty','push','pdeck','lext','slext','slcurl','llcurl','abduct','scalf','lpcalf','neck','pallof','sllp','jmp','dips']);
+function repRange(r){const m=String(r).match(/(\d+)(?:–(\d+))?/);return m?{lo:+m[1],hi:+(m[2]||m[1])}:null}
+function lastLift(id,date){const h=(S.profile.liftLog||{})[id]||{};const d=Object.keys(h).filter(x=>x<date).sort().pop();return d?{...h[d],date:d}:null}
+function nextTarget(e,date){
+  const last=lastLift(e.id,date),rr=repRange(e.r);if(!last||!rr)return null;
+  const inc=SMALL_LIFTS.has(e.id)?1:2.5;
+  if(last.reps&&last.reps>=rr.hi)return{kg:r1(last.kg+inc),why:`You hit ${last.reps} reps last time. Go up ${inc} kg.`,up:true};
+  if(last.reps&&last.reps<rr.lo)return{kg:last.kg,why:`Stay here until you get ${rr.lo}+ reps.`};
+  return{kg:last.kg,why:last.reps?`Same weight, beat ${last.reps} reps.`:'Same weight. Log reps so the coach can move you up.'};
+}
+
+/* ---------- protein helper ---------- */
+const PROT_OPTS=[['whey',1],['gyog',2],['tuna',1],['chicken',1.5],['cottage',2],['egg',3],['casein',1],['protbar',1],['laban',1]];
+function proteinIdeas(need){
+  const night=new Date().getHours()>=21,opts=PROT_OPTS.filter(([id])=>night?id!=='protbar':id!=='casein'),combos=[];
+  opts.forEach((a,i)=>{combos.push([a]);opts.slice(i+1).forEach(b=>combos.push([a,b]))});
+  return combos.map(c=>({c,s:sumItems(c)})).filter(x=>x.s.p>=need*0.85&&x.s.p<=need+25)
+    .sort((x,y)=>(Math.abs(x.s.p-need)+x.c.length*6+x.s.k/60)-(Math.abs(y.s.p-need)+y.c.length*6+y.s.k/60)).slice(0,3);
+}
+function viewProteinHelper(){
+  if(S.date!==TODAY)return '';
+  const need=r0(targets(S.date).p-totals(S.day.foods).p),h=new Date().getHours();
+  if(need<15||(need>80&&h<17))return '';
+  const label=([id,q])=>{const f=foodById(id),a=amtInfo(f);return a?`${r0(q*a.base)} ${a.unit} ${f.n.replace(/ \(.*\)/,'').toLowerCase()}`:`${qtyLabel(q)} ${f.u.replace(/^1 /,'')} ${f.n.replace(/ \(.*\)/,'').toLowerCase()}`.replace(/^(\d+) (\w+) \2/,'$1 $2')};
+  const ideas=need<=80?proteinIdeas(need):[];
+  return `<section class="card"><div class="row between"><h3>Protein: ${need} g to go</h3><span class="chip warn">helper</span></div>
+    ${ideas.length?`<div class="list">${ideas.map(x=>`<div class="li"><div class="t"><b>${x.c.map(label).map(esc).join(' + ')}</b><small class="num">${r0(x.s.p)} g protein · ${r0(x.s.k)} kcal</small></div><button class="btn ghost sm" data-a="logIdea" data-v="${x.c.map(([id,q])=>id+':'+q).join(',')}">Log</button></div>`).join('')}</div>`
+    :`<p style="font-size:13.5px">That's a big gap. Log the meals from your plan first (Food tab), then check back here.</p>`}
+  </section>`;
+}
+
+/* ---------- day cache, streaks and the cycle report ---------- */
+async function getDay(d){if(d===S.date)return S.day;if(!S.dayCache[d])S.dayCache[d]=Object.assign(blankDay(),await load(dayKey(d))||{});return S.dayCache[d]}
+const CHECKS={
+  protein:(d,day)=>totals(day.foods).p>=targets(d).p*0.9,
+  water:(d,day)=>(day.water||0)>=13,
+  train:(d,day)=>{if(dayPlan(d).type!=='train')return true;const wp=workoutProgress(d,day);return wp.total>0&&wp.done>=wp.total*0.5},
+};
+async function computeStreaks(){
+  if(TODAY<START){S.streaks=null;return}
+  const res={},tday=await getDay(TODAY);
+  for(const k of Object.keys(CHECKS)){
+    let n=0,d=addDays(TODAY,-1);
+    while(d>=START&&n<400){if(!CHECKS[k](d,await getDay(d)))break;n++;d=addDays(d,-1)}
+    const t=CHECKS[k](TODAY,tday);res[k]={n:n+(t?1:0),today:t};
+  }
+  S.streaks=res;
+}
+let streakT;
+function scheduleStreaks(){clearTimeout(streakT);streakT=setTimeout(async()=>{await computeStreaks();if(S.tab==='today'&&!S.sheet)render()},400)}
+function viewStreaks(){
+  if(S.date!==TODAY||!S.streaks)return '';
+  const tile=(k,n)=>{const s=S.streaks[k];return `<div class="streak ${s.today?'done':''}"><b class="num">${s.n}</b><span>${n}</span><small>${s.today?'today done':'today to do'}</small></div>`};
+  return `<section class="streaks" aria-label="Streaks in days">${tile('protein','Protein days')}${tile('train','Training on plan')}${tile('water','Water days')}</section>`;
+}
+const cycleStartOf=d=>d<START?START:addDays(d,-cycleIdx(d));
+async function buildReport(start){
+  const days=[...Array(8)].map((_,i)=>addDays(start,i)).filter(d=>d<=TODAY);
+  const rows=[];for(const d of days)rows.push({d,day:await getDay(d)});
+  const logged=rows.filter(r=>r.day.foods.length);
+  const kc=logged.map(r=>totals(r.day.foods).k),tg=logged.map(r=>targets(r.d).kcal);
+  const trainDays=rows.filter(r=>dayPlan(r.d).type==='train');
+  const w=S.profile.weights,wd=Object.keys(w).filter(d=>d>=start&&d<=addDays(start,7)).sort();
+  const prs=[];const log=S.profile.liftLog||{};
+  Object.keys(log).forEach(id=>{const h=log[id],ds=Object.keys(h).sort();let best=0;ds.forEach(d=>{const v=e1rm(h[d]);if(v>best){if(d>=start&&d<=addDays(start,7)&&best>0)prs.push(id);best=v}})});
+  return{start,days:rows.length,logged:logged.length,
+    avgK:logged.length?r0(kc.reduce((a,b)=>a+b,0)/logged.length):0,avgT:logged.length?r0(tg.reduce((a,b)=>a+b,0)/logged.length):0,
+    protein:rows.filter(r=>CHECKS.protein(r.d,r.day)).length,water:rows.filter(r=>CHECKS.water(r.d,r.day)).length,
+    workouts:trainDays.filter(r=>CHECKS.train(r.d,r.day)).length,trainDays:trainDays.length,
+    wFrom:wd.length?w[wd[0]]:null,wTo:wd.length?w[wd[wd.length-1]]:null,prs:[...new Set(prs)]};
+}
+function viewReport(){
+  const cur=cycleStartOf(TODAY),sel=S.repStart||cur,prev=addDays(cur,-8);
+  if(!S.repData||S.repData.start!==sel){buildReport(sel).then(r=>{S.repData=r;if(S.tab==='progress'&&S.progSub==='report')render()});return `<section class="card"><p class="muted">Building your report…</p></section>`}
+  const r=S.repData,st=weightStats();
+  let action;
+  if(r.logged<4)action='Log food on at least 4 days of a cycle to get a useful report.';
+  else if(r.protein<r.days/2)action='Protein is your gap. Use the protein helper on Today every afternoon.';
+  else if(st.rate!==null&&st.rate<0.2)action='Weight is barely moving. Add 150 kcal.';
+  else if(st.rate!==null&&st.rate>0.5)action='Weight is rising too fast. Take 150 kcal off.';
+  else if(r.workouts<r.trainDays)action='Food is on track. Make every training day count this cycle.';
+  else action='Everything is on track. Keep going.';
+  const adjBtn=/Add 150/.test(action)?`<button class="btn sm" data-a="adj" data-v="150">Add 150 kcal</button>`:/150 kcal off/.test(action)?`<button class="btn sm" data-a="adj" data-v="-150">Take 150 off</button>`:'';
+  const stat=(v,l)=>`<div class="stat"><b class="num">${v}</b><span>${l}</span></div>`;
+  return `<section class="card">
+    <div class="row between"><div><div class="eyebrow">8-day cycle report</div><h3>${esc(fmtDate(sel))} – ${esc(fmtDate(addDays(sel,7)))}</h3></div>
+      <div class="tabs-inline">${prev>=START?`<button class="${sel===prev?'on':''}" data-a="repStart" data-v="${prev}">Last</button>`:''}<button class="${sel===cur?'on':''}" data-a="repStart" data-v="${cur}">This</button></div></div>
+    ${sel===cur&&r.days<8?`<p class="muted" style="font-size:12.5px">In progress: day ${r.days} of 8.</p>`:''}
+    <div class="stats">
+      ${stat(r.logged?r.avgK:'—','Avg kcal'+(r.logged?' / '+r.avgT:''))}
+      ${stat(r.protein+'/'+r.days,'Protein days')}
+      ${stat(r.workouts+'/'+r.trainDays,'Workouts done')}
+      ${stat(r.water+'/'+r.days,'Water days')}
+      ${stat(r.wFrom!=null&&r.wTo!=null&&r.wFrom!==r.wTo?(r.wTo-r.wFrom>=0?'+':'')+r1(r.wTo-r.wFrom):'—','Weight change kg')}
+      ${stat(r.prs.length,'New PRs')}
+    </div>
+    ${r.prs.length?`<p style="font-size:13px"><b>PRs:</b> ${r.prs.map(id=>esc((EXBYID[id]||{n:id}).n)).join(', ')}</p>`:''}
+    <div class="callout"><b>Next cycle</b><p>${esc(action)}</p>${adjBtn?`<div>${adjBtn}</div>`:''}</div>
+  </section>`;
+}
+
 /* ---------- move a day's log to another date (for logging on the wrong day) ---------- */
 function dayHasData(){const d=S.day;return d.foods.length||d.water||d.sleep||['routine','habits','supps','sets','kg','reps'].some(k=>Object.values(d[k]||{}).some(v=>Array.isArray(v)?v.some(Boolean):v))||S.profile.weights[S.date]!=null&&S.date!==REPORT.date}
 function viewMoveDay(){
@@ -612,7 +766,7 @@ async function moveDay(src,target){
   to.water=Math.min(14,(to.water||0)+(from.water||0));
   ['routine','habits','supps','sets','kg','reps'].forEach(k=>{to[k]={...(from[k]||{}),...(to[k]||{})}});
   if(!to.sleep)to.sleep=from.sleep;
-  save(dayKey(target),to);save(dayKey(src),blankDay());
+  save(dayKey(target),to);save(dayKey(src),blankDay());S.dayCache[target]=to;S.dayCache[src]=blankDay();S.repData=null;scheduleStreaks();
   const pr=S.profile;
   if(pr.weights[src]!=null&&src!==REPORT.date&&pr.weights[target]==null){const w={...pr.weights};w[target]=w[src];delete w[src];pr.weights=w}
   const log={...(pr.liftLog||{})};Object.keys(log).forEach(id=>{const h={...log[id]};if(h[src]&&!h[target]){h[target]=h[src];delete h[src];log[id]=h}});pr.liftLog=log;
@@ -622,8 +776,8 @@ async function moveDay(src,target){
 
 function viewFood(){
   const type=dayType(S.date),t=targets(S.date),tot=totals(S.day.foods);
-  const meals=MEALS.filter(m=>!(m.train&&type!=='train'));
-  const plan=sumItems(MEALS.flatMap(m=>mealItems(m,type)));
+  const MS=mealsFor(S.date),meals=MS.filter(m=>!(m.train&&type!=='train')),ids=new Set(meals.map(m=>m.id));
+  const plan=sumItems(MS.flatMap(m=>mealItems(m,type)));
   return `
   <section class="card">
     <div class="row between"><div><div class="eyebrow">${type==='train'?'Training day':'Rest day'}</div><h2 class="num">${r0(tot.k)} / ${t.kcal} kcal</h2></div><div class="row" style="gap:6px"><button class="btn ghost sm" data-a="openAI">AI photo</button><button class="btn sm" data-a="openAdd" data-v="">+ Add</button></div></div>
@@ -631,13 +785,15 @@ function viewFood(){
     <p class="muted" style="font-size:12.5px">The full plan below adds up to ${r0(plan.k)} kcal, ${r0(plan.p)}g protein, ${r0(plan.c)}g carbs, ${r0(plan.f)}g fat. Tap “Log plan” on a meal when you eat it as written.</p>
   </section>
   ${meals.map(m=>{
-    const es=S.day.foods.filter(e=>e.meal===m.id),mt=totals(es),items=mealItems(m,type),ps=sumItems(items);
+    const es=S.day.foods.filter(e=>e.meal===m.id||m.id==='extra'&&!ids.has(e.meal)),mt=totals(es),items=mealItems(m,type),ps=sumItems(items);
     return `<section class="card meal">
       <div class="mh"><h3>${esc(m.n)}</h3><span class="muted" style="font-size:12px">${esc(m.time)}</span><span class="k num">${r0(mt.k)} kcal</span></div>
       ${items.length?`<p class="plan-hint">Plan: ${items.map(([id,q])=>{const f=foodById(id);return esc(qtyLabel(q)+' × '+f.n+' ('+f.u+')')}).join(', ')} · ${r0(ps.k)} kcal, ${r0(ps.p)}g protein${m.id==='dinner'?'. Swap salmon for lean beef or chicken on other days.':''}</p>`:`<p class="plan-hint">Snacks off-plan, or extra food on days you need more.</p>`}
       ${es.length?`<div class="list">${es.map(e=>`<div class="li"><div class="t"><b>${esc(e.name)}</b><small class="num">${qtyLabel(e.qty)} × ${esc(e.unit)} · P ${r0(e.p)} · C ${r0(e.c)} · F ${r0(e.f)}</small></div><span class="num" style="font-weight:600">${e.kcal}</span><button class="x" data-a="delFood" data-v="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`).join('')}</div>`:''}
-      <div class="row">${items.length?(es.some(e=>isPlanEntry(e,m,type))?`<button class="btn sm" data-a="unlogPlan" data-v="${m.id}">✓ Logged · Undo</button>`:`<button class="btn ghost sm" data-a="logPlan" data-v="${m.id}">Log plan</button>`):''}<button class="btn ghost sm" data-a="openAdd" data-v="${m.id}">+ Food</button></div>
-    </section>`}).join('')}`;
+      <div class="row">${items.length?(es.some(e=>isPlanEntry(e,m,type))?`<button class="btn sm" data-a="unlogPlan" data-v="${m.id}">✓ Logged · Undo</button>`:`<button class="btn ghost sm" data-a="logPlan" data-v="${m.id}">Log plan</button>`):''}<button class="btn ghost sm" data-a="openAdd" data-v="${m.id}">+ Food</button>${es.length?`<button class="btn ghost sm" data-a="askSaveMeal" data-v="${m.id}">Save meal</button>`:''}</div>
+      ${S.saveMealFor===m.id?`<div class="row"><input id="smName" type="text" placeholder="Name, e.g. My usual breakfast" value="${esc(m.n)}"><button class="btn sm" data-a="saveMeal" data-v="${m.id}">Save</button><button class="btn ghost sm" data-a="cancelSaveMeal">Cancel</button></div>`:''}
+    </section>`}).join('')}
+  ${viewRamadanSetup()}`;
 }
 
 function viewTrain(){
@@ -652,16 +808,18 @@ function viewTrain(){
   <section class="card">
     <div class="row between"><div><h2>${esc(p.name)}</h2><p class="muted">${esc(p.sub)}</p></div>${isLogDay?`<span class="chip">Logging ${esc(fmtDate(S.date))}</span>`:`<button class="btn ghost sm" data-a="trainDay" data-v="${cur}">Back to ${esc(fmtDate(S.date).split(' ')[0])}</button>`}</div>
     ${p.type==='train'?`<p class="muted" style="font-size:13px">Warm up with 2 light sets on the first lift. When you hit the top of the rep range on every set, add 2.5 kg next time.</p>`:''}
+    ${isRamadan(S.date)?`<p class="callout" style="font-size:13px"><b>Ramadan:</b> train 1.5–2 hours after iftar, around 21:00. If you feel flat, drop the last set of each lift. Do Stamina day as a walk after iftar, never cardio while fasting.</p>`:''}
     <p class="callout" style="font-size:13px">Back-safe plan: no squats, deadlifts, bent-over rows, standing overhead presses, ab wheel or twists. Machines and benches support your spine. If any move hurts your lower back, stop it and see a physio.</p>
   </section>
   ${p.blocks.map(b=>`<section class="card"><h3>${esc(b.t)}</h3><div>${b.items.map(e=>{
-     const sets=S.day.sets[e.id]||[],last=S.profile.lifts[e.id];
+     const sets=S.day.sets[e.id]||[],last=e.w?lastLift(e.id,S.date):null,tgt=e.w&&isLogDay?nextTarget(e,S.date):null;
      const open=S.openDemo===e.id;
      return `<div class="ex"><div class="head"><b>${esc(e.n)}</b><span class="meta num">${e.s>1?e.s+' × ':''}${esc(e.r)}</span></div>
-       <div class="row between"><div class="meta">Rest ${esc(e.rest)}${e.w&&last?` · Last: <b class="num" style="color:var(--ink)">${esc(last.kg)} kg</b> on ${esc(fmtDate(last.date))}`:''}</div>${NODEMO.has(e.id)?'':`<button class="demo-btn" data-a="demo" data-v="${e.id}" aria-expanded="${open}">${open?'Hide demo':'▶ Demo'}</button>`}</div>
+       <div class="row between"><div class="meta">Rest ${esc(e.rest)}${last?` · Last: <b class="num" style="color:var(--ink)">${esc(fmtSet(last))}</b> on ${esc(fmtDate(last.date))}`:''}</div>${NODEMO.has(e.id)?'':`<button class="demo-btn" data-a="demo" data-v="${e.id}" aria-expanded="${open}">${open?'Hide demo':'▶ Demo'}</button>`}</div>
        ${open?`${demo(e.id)}${vlink(exVideo(e))}`:''}
+       ${tgt?`<div class="coach ${tgt.up?'up':''}"><b class="num">Today: ${tgt.kg} kg × ${esc(e.r)}</b><span>${esc(tgt.why)}</span></div>`:''}
        ${e.tip?`<div class="tip">${esc(e.tip)}</div>`:''}
-       ${isLogDay?`<div class="sets">${Array.from({length:e.s},(_,i)=>`<button class="set ${sets[i]?'on':''}" data-a="set" data-v="${e.id}" data-i="${i}" aria-label="Set ${i+1}">${e.s>1?i+1:'Done'}</button>`).join('')}${e.w?`<input id="kg-${e.id}" type="number" inputmode="decimal" step="0.5" class="kg" placeholder="kg" value="${esc(S.day.kg[e.id]||'')}" data-c="kg" data-v="${e.id}" aria-label="${esc(e.n)} working weight kg"><input id="reps-${e.id}" type="number" inputmode="numeric" step="1" class="kg" style="width:70px!important" placeholder="reps" value="${esc((S.day.reps||{})[e.id]||'')}" data-c="reps" data-v="${e.id}" aria-label="${esc(e.n)} reps on best set">`:''}</div>`:''}
+       ${isLogDay?`<div class="sets">${Array.from({length:e.s},(_,i)=>`<button class="set ${sets[i]?'on':''}" data-a="set" data-v="${e.id}" data-i="${i}" aria-label="Set ${i+1}">${e.s>1?i+1:'Done'}</button>`).join('')}${e.w?`<input id="kg-${e.id}" type="number" inputmode="decimal" step="0.5" class="kg" placeholder="${tgt?tgt.kg:'kg'}" value="${esc(S.day.kg[e.id]||'')}" data-c="kg" data-v="${e.id}" aria-label="${esc(e.n)} working weight kg"><input id="reps-${e.id}" type="number" inputmode="numeric" step="1" class="kg" style="width:70px!important" placeholder="reps" value="${esc((S.day.reps||{})[e.id]||'')}" data-c="reps" data-v="${e.id}" aria-label="${esc(e.n)} reps on best set">`:''}</div>`:''}
      </div>`}).join('')}</div></section>`).join('')}`;
 }
 
@@ -772,11 +930,11 @@ function chart(){
     <text x="${W-R}" y="${H-10}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtDate(ymd(new Date(t1)))}</text>
   </svg>`;
 }
-const PSUB=[['weight','Weight'],['strength','Strength'],['photos','Photos'],['body','Body'],['scan','Scan']];
+const PSUB=[['weight','Weight'],['report','Report'],['strength','Strength'],['photos','Photos'],['body','Body'],['scan','Scan']];
 const CHECKIN_DAYS=14;
 function viewProgress(){
   const sub=S.progSub||'weight';
-  const body={weight:progWeight,strength:viewStrength,photos:viewPhotos,body:viewBody,scan:progScan}[sub]();
+  const body={weight:progWeight,report:viewReport,strength:viewStrength,photos:viewPhotos,body:viewBody,scan:progScan}[sub]();
   return `<div class="tabs-inline" role="tablist">${PSUB.map(([k,n])=>`<button role="tab" aria-selected="${k===sub}" class="${k===sub?'on':''}" data-a="progSub" data-v="${k}">${n}${dueFor(k)?' ●':''}</button>`).join('')}</div>${body}`;
 }
 function progWeight(){
@@ -1062,6 +1220,7 @@ function sheetHome(){
     </div>
     ${sh.err?`<p style="color:var(--prot);font-size:13px;padding-top:10px">${esc(sh.err)}</p>`:''}
     ${q.length>=2?`<button class="btn ghost full" style="margin-top:10px" data-a="searchOnline">Search "${esc(sh.q.trim())}" online</button>`:''}
+    ${!q&&(S.profile.savedMeals||[]).length?`<div class="eyebrow" style="padding-top:14px">Saved meals</div>${S.profile.savedMeals.map(sm=>{const t=totals(sm.items);return `<div class="food-pick"><button class="t" style="border:0;background:transparent;text-align:left;padding:0" data-a="addSaved" data-v="${sm.id}"><b>${esc(sm.n)}</b><small class="num">${sm.items.length} item${sm.items.length===1?'':'s'} · P ${r0(t.p)} · C ${r0(t.c)} · F ${r0(t.f)}</small></button><span class="k num">${r0(t.k)}</span><button class="x" data-a="delSaved" data-v="${sm.id}" aria-label="Delete ${esc(sm.n)}">×</button></div>`}).join('')}`:''}
     ${!q&&recent.length?`<div class="eyebrow" style="padding-top:14px">Recent</div>${recent.map(row).join('')}`:''}
     <div class="eyebrow" style="padding-top:14px">${q?'Matches':'All foods'}</div>
     ${list.map(row).join('')||'<p class="muted" style="padding:10px 0">Nothing saved matches. Search online, or use Quick add.</p>'}
@@ -1074,7 +1233,7 @@ function sheetPick(){
       ?`<input id="amtIn" type="number" inputmode="decimal" step="1" min="1" value="${r0(q*a.base)}" data-c="amt" aria-label="Amount in ${a.unit}">`
       :`<input id="qtyIn" type="number" inputmode="decimal" step="0.25" min="0.25" value="${q}" data-c="qty" aria-label="Servings">`}<button data-a="qty" data-v="1" aria-label="More">+</button></div><span class="muted">${a?a.unit+' eaten':'servings'}</span></div>
     <p class="num" style="font-weight:600">${r0(f.k*q)} kcal · P ${r0(f.p*q)} · C ${r0(f.c*q)} · F ${r0(f.f*q)}</p>
-    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="addFood">Add to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div></div>`;
+    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="addFood">Add to ${esc(mealName(sh.meal))}</button></div></div>`;
 }
 function sheetOnline(){
   const sh=S.sheet;
@@ -1089,7 +1248,7 @@ function sheetQuick(){
     <label class="f">What was it?<input id="qkN" type="text" placeholder="e.g. Shawarma plate, Al Mallah"></label>
     <div class="grid2"><label class="f">kcal<input id="qkK" type="number" inputmode="decimal"></label><label class="f">Protein g<input id="qkP" type="number" inputmode="decimal"></label><label class="f">Carbs g (optional)<input id="qkC" type="number" inputmode="decimal"></label><label class="f">Fat g (optional)<input id="qkF" type="number" inputmode="decimal"></label></div>
     ${sh.err?`<p style="color:var(--prot);font-size:13px">${esc(sh.err)}</p>`:''}
-    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="saveQuick">Add to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div></div>`;
+    <div class="row"><button class="btn ghost" data-a="sheetBack">Back</button><button class="btn" style="flex:1" data-a="saveQuick">Add to ${esc(mealName(sh.meal))}</button></div></div>`;
 }
 function sheetScan(){
   return `<div class="card"><div class="row between"><b>Scan barcode</b><button class="btn ghost sm" data-a="sheetBack">Back</button></div>
@@ -1114,7 +1273,7 @@ function sheetAI(){
       ${ai.note?`<p class="muted" style="font-size:12.5px">${esc(ai.note)}</p>`:''}
       <div class="list">${ai.items.map((it,i)=>{const s=aiScaled(it);return `<div class="li"><button class="check ${it.on?'on':''}" data-a="aiToggle" data-v="${i}" aria-label="Include ${esc(it.name)}"></button><div class="t"><b>${esc(it.name)}${it.confidence==='low'?' <span class="chip warn" style="padding:1px 7px;font-size:10px">unsure</span>':''}</b><small class="num">${s.k} kcal · P ${s.p} · C ${s.c} · F ${s.f}</small></div><input id="aig-${i}" type="number" inputmode="decimal" class="kg" style="width:74px!important" value="${r0(+it.grams||0)}" data-c="aig" data-v="${i}" aria-label="${esc(it.name)} grams"><span class="muted" style="font-size:12px">g</span></div>`}).join('')}</div>
       <p class="muted" style="font-size:12px">These are AI estimates. Fix the grams if you know better; untick anything that isn't yours.</p>
-      <div class="row"><label class="btn ghost" for="aiFile">Retake</label><button class="btn" style="flex:1" data-a="aiAdd" ${on.length?'':'disabled'}>Add ${on.length} to ${esc(MEALS.find(m=>m.id===sh.meal).n)}</button></div>
+      <div class="row"><label class="btn ghost" for="aiFile">Retake</label><button class="btn" style="flex:1" data-a="aiAdd" ${on.length?'':'disabled'}>Add ${on.length} to ${esc(mealName(sh.meal))}</button></div>
       <input id="aiFile" type="file" accept="image/*" capture="environment" data-c="aiFile" hidden></div>`;
   }
   return `<div class="card"><div class="row between"><b>AI meal photo</b><button class="btn ghost sm" data-a="sheetBack">Back</button></div>
@@ -1129,8 +1288,8 @@ function renderSheet(){
   const el=$('#sheet');
   if(!S.sheet){el.innerHTML='';return}
   const sh=S.sheet,type=dayType(S.date);
-  const meals=MEALS.filter(m=>!(m.train&&type!=='train'));
-  if(!sh.meal)sh.meal=meals[0].id;
+  const meals=mealsFor(S.date).filter(m=>!(m.train&&type!=='train'));
+  if(!sh.meal||!meals.some(m=>m.id===sh.meal))sh.meal=meals[0].id;
   const custom=()=>`<div class="card"><b>New food</b>
       <label class="f">Name<input id="cfN" type="text" placeholder="e.g. Mum's machboos"></label>
       <label class="f">Serving (use "100 g" when copying a label)<input id="cfU" type="text" placeholder="e.g. 100 g, 1 plate"></label>
@@ -1212,11 +1371,11 @@ const actions={
   },
   delFood(v){S.day.foods=S.day.foods.filter(e=>e.id!==v);saveDay();render()},
   logPlan(v){
-    const m=MEALS.find(x=>x.id===v),type=dayType(S.date);
+    const m=mealsFor(S.date).find(x=>x.id===v),type=dayType(S.date);
     if(S.day.foods.some(e=>isPlanEntry(e,m,type)))return;
     S.day.foods=S.day.foods.concat(mealItems(m,type).map(([id,q])=>entryFrom(foodById(id),q,m.id,true)));saveDay();render();
   },
-  unlogPlan(v){const m=MEALS.find(x=>x.id===v),type=dayType(S.date);S.day.foods=S.day.foods.filter(e=>!isPlanEntry(e,m,type));saveDay();render()},
+  unlogPlan(v){const m=mealsFor(S.date).find(x=>x.id===v),type=dayType(S.date);S.day.foods=S.day.foods.filter(e=>!isPlanEntry(e,m,type));saveDay();render()},
   openAdd(v){S.sheet={mode:'search',meal:v||suggestMeal(),q:'',qty:1};renderSheet();setTimeout(()=>{const i=$('#foodSearch');if(i&&matchMedia('(hover:hover)').matches)i.focus()},50)},
   closeSheet(v,el,ev){if(ev.target!==el)return;stopScan();S.sheet=null;renderSheet()},
   sheetMeal(v){S.sheet.meal=v;renderSheet()},
@@ -1263,6 +1422,18 @@ const actions={
   grocery(v){S.profile.grocery={...S.profile.grocery,[v]:!S.profile.grocery[v]};saveProfile();render()},
   saveName(){const v=$('#nameIn').value.trim().slice(0,30);if(!v)return;S.profile.name=v;saveProfile();render()},
   askReset(){S.confirm='grocery';render()},
+  ramToggle(){const r=ramadan();S.profile.ramadan={...r,on:!r.on};saveProfile();render()},
+  repStart(v){S.repStart=v;S.repData=null;render()},
+  logIdea(v){const meal=suggestMeal();v.split(',').forEach(x=>{const[id,q]=x.split(':');S.day.foods.push(entryFrom(foodById(id),Number(q),meal))});saveDay();render()},
+  askSaveMeal(v){S.saveMealFor=v;render();setTimeout(()=>{const i=$('#smName');i&&i.select&&i.select()},30)},
+  cancelSaveMeal(){S.saveMealFor=null;render()},
+  saveMeal(v){
+    const n=($('#smName').value||'').trim().slice(0,40)||mealName(v);
+    const items=S.day.foods.filter(e=>e.meal===v).map(({id,meal,...rest})=>rest);if(!items.length)return;
+    S.profile.savedMeals=[{id:'sm-'+uid(),n,items},...(S.profile.savedMeals||[])].slice(0,40);saveProfile();S.saveMealFor=null;render();
+  },
+  addSaved(v){const sm=(S.profile.savedMeals||[]).find(x=>x.id===v);if(!sm)return;sm.items.forEach(it=>S.day.foods.push({...it,id:uid(),meal:S.sheet.meal}));saveDay();S.sheet=null;render()},
+  delSaved(v){S.profile.savedMeals=(S.profile.savedMeals||[]).filter(x=>x.id!==v);saveProfile();renderSheet()},
   askMove(){const v=($('#moveTo')||{}).value;if(!v||v===S.date)return;S.moveTo=v;S.confirm='move';render()},
   async doMove(){const src=S.date,to=S.moveTo;S.confirm=null;S.moveTo=null;if(!to||to===src)return;await moveDay(src,to);await goDate(to)},
   cancelConfirm(){S.confirm=null;render()},
@@ -1278,6 +1449,7 @@ const actions={
 };
 function suggestMeal(){
   const h=new Date().getHours(),type=dayType(S.date);
+  if(isRamadan(S.date)){if(S.date!==TODAY)return 'iftar';return h<5?'suhoor':h<19?'iftar':h<21?'main':h<22?(type==='train'?'rpre':'late'):h<23?(type==='train'?'rpost':'late'):'late'}
   const order=[[10,'breakfast'],[13,'snack'],[16,'lunch'],[19,type==='train'?'pre':'dinner'],[21,type==='train'?'post':'dinner'],[24,'dinner']];
   return S.date===TODAY?order.find(([lim])=>h<lim)[1]:'breakfast';
 }
@@ -1301,6 +1473,7 @@ document.addEventListener('change',ev=>{
   if(c==='sleep'){S.day.sleep=el.value;saveDay()}
   if(c==='cmpA'||c==='cmpB'){S[c]=el.value;render()}
   if(c==='moveTo'){S.moveTo=el.value}
+  if(c==='ramS'||c==='ramE'){const r=ramadan(),k=c==='ramS'?'start':'end';if(el.value){S.profile.ramadan={...r,[k]:el.value};saveProfile();render()}}
   if(c==='photo'&&el.files[0]){const pose=el.dataset.v,date=S.date,file=el.files[0];(async()=>{
     try{const blob=await shrinkImage(file);await PhotoDB.put({key:date+'|'+pose,date,pose,blob});S.photoErr=''}
     catch(e){S.photoErr='Could not save that photo. Try a JPEG or PNG from your Photos.'}
@@ -1324,15 +1497,16 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
   render();
   loadPhotos().then(()=>{if(S.tab==='progress'||S.tab==='today')render()});
   await initCloud();
-  if(Cloud.ready){await loadProfile();await loadDay();render()}
+  if(Cloud.ready){S.dayCache={};await loadProfile();await loadDay();render()}
+  await computeStreaks();if(S.tab==='today')render();
 })();
 </script>
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#1E5BCB;color:#fff;box-shadow:0 8px 24px rgb(0 0 0 / .3)}.ver{font-size:11px;color:var(--muted);text-align:center;padding:2px 0 8px}</style>
 <script>
-const APP_VERSION='6e9ce40b51';
+const APP_VERSION='a9b2ff9fe7';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
-(()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('.wrap');w&&w.appendChild(v)})();
+(()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('div.wrap');w&&w.appendChild(v)})();
 async function checkUpdate(){
   try{
     const t=await (await fetch('./index.html?check='+Date.now(),{cache:'no-store'})).text();
