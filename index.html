@@ -587,7 +587,33 @@ function viewToday(){
     <div class="list">${SUPPS.map(([k,n])=>`<div class="li"><button class="check ${S.day.supps[k]?'on':''}" data-a="supp" data-v="${k}" aria-label="${esc(n)}"></button><div class="t"><b>${esc(n)}</b></div></div>`).join('')}
       <div class="li"><div class="t"><b>Hours slept last night</b><small>Muscle is built while you sleep. Aim for 7–9.</small></div><input id="sleepIn" type="number" inputmode="decimal" step="0.5" min="0" max="14" class="kg" value="${esc(S.day.sleep||'')}" data-c="sleep" placeholder="h"></div>
     </div>
+  </section>
+  ${dayHasData()?viewMoveDay():''}`;
+}
+
+/* ---------- move a day's log to another date (for logging on the wrong day) ---------- */
+function dayHasData(){const d=S.day;return d.foods.length||d.water||d.sleep||['routine','habits','supps','sets','kg','reps'].some(k=>Object.values(d[k]||{}).some(v=>Array.isArray(v)?v.some(Boolean):v))||S.profile.weights[S.date]!=null&&S.date!==REPORT.date}
+function viewMoveDay(){
+  const to=S.moveTo||addDays(S.date,1);
+  return `<section class="card">
+    <h3>Logged on the wrong day?</h3>
+    ${S.confirm==='move'?`<p style="font-size:14px">Move everything from <b>${esc(fmtDate(S.date))}</b> to <b>${esc(fmtDate(to))}</b>? Food, water, checklists, sleep, workout sets and weight move. ${esc(fmtDate(S.date))} is left empty. If ${esc(fmtDate(to))} already has entries, they are kept and combined.</p>
+      <div class="row"><button class="btn" data-a="doMove">Move</button><button class="btn ghost" data-a="cancelConfirm">Cancel</button></div>`
+    :`<div class="row"><label class="f" style="flex:1">Move this day's log to<input id="moveTo" type="date" value="${to}" data-c="moveTo"></label><button class="btn" style="align-self:end" data-a="askMove">Move</button></div>`}
   </section>`;
+}
+async function moveDay(src,target){
+  const from=S.day,to=Object.assign(blankDay(),await load(dayKey(target))||{});
+  to.foods=[...to.foods,...from.foods];
+  to.water=Math.min(14,(to.water||0)+(from.water||0));
+  ['routine','habits','supps','sets','kg','reps'].forEach(k=>{to[k]={...(from[k]||{}),...(to[k]||{})}});
+  if(!to.sleep)to.sleep=from.sleep;
+  save(dayKey(target),to);save(dayKey(src),blankDay());
+  const pr=S.profile;
+  if(pr.weights[src]!=null&&src!==REPORT.date&&pr.weights[target]==null){const w={...pr.weights};w[target]=w[src];delete w[src];pr.weights=w}
+  const log={...(pr.liftLog||{})};Object.keys(log).forEach(id=>{const h={...log[id]};if(h[src]&&!h[target]){h[target]=h[src];delete h[src];log[id]=h}});pr.liftLog=log;
+  const lifts={...(pr.lifts||{})};Object.keys(lifts).forEach(id=>{if(lifts[id].date===src)lifts[id]={...lifts[id],date:target}});pr.lifts=lifts;
+  saveProfile();
 }
 
 function viewFood(){
@@ -1154,7 +1180,7 @@ function beep(){
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
 
 /* ---------- actions ---------- */
-async function goDate(s){S.date=s;S.trainDay=null;S.day=blankDay();render();await loadDay();render()}
+async function goDate(s){S.moveTo=null;S.confirm=null;S.date=s;S.trainDay=null;S.day=blankDay();render();await loadDay();render()}
 const actions={
   tab(v){S.tab=v;S.confirm=null;if(v==='train')S.trainDay=null;try{localStorage.setItem(LS+'tab',v)}catch(e){}render();window.scrollTo(0,0)},
   prev(){goDate(addDays(S.date,-1))},
@@ -1233,6 +1259,8 @@ const actions={
   grocery(v){S.profile.grocery={...S.profile.grocery,[v]:!S.profile.grocery[v]};saveProfile();render()},
   saveName(){const v=$('#nameIn').value.trim().slice(0,30);if(!v)return;S.profile.name=v;saveProfile();render()},
   askReset(){S.confirm='grocery';render()},
+  askMove(){const v=($('#moveTo')||{}).value;if(!v||v===S.date)return;S.moveTo=v;S.confirm='move';render()},
+  async doMove(){const src=S.date,to=S.moveTo;S.confirm=null;S.moveTo=null;if(!to||to===src)return;await moveDay(src,to);await goDate(to)},
   cancelConfirm(){S.confirm=null;render()},
   resetGrocery(){S.profile.grocery={};S.confirm=null;saveProfile();render()},
   exportData(){
@@ -1268,6 +1296,7 @@ document.addEventListener('change',ev=>{
   if(c==='aiFile'&&el.files[0])runAI(el.files[0]);
   if(c==='sleep'){S.day.sleep=el.value;saveDay()}
   if(c==='cmpA'||c==='cmpB'){S[c]=el.value;render()}
+  if(c==='moveTo'){S.moveTo=el.value}
   if(c==='photo'&&el.files[0]){const pose=el.dataset.v,date=S.date,file=el.files[0];(async()=>{
     try{const blob=await shrinkImage(file);await PhotoDB.put({key:date+'|'+pose,date,pose,blob});S.photoErr=''}
     catch(e){S.photoErr='Could not save that photo. Try a JPEG or PNG from your Photos.'}
@@ -1297,7 +1326,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#1E5BCB;color:#fff;box-shadow:0 8px 24px rgb(0 0 0 / .3)}.ver{font-size:11px;color:var(--muted);text-align:center;padding:2px 0 8px}</style>
 <script>
-const APP_VERSION='684b0b74bb';
+const APP_VERSION='8538357b30';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 (()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('.wrap');w&&w.appendChild(v)})();
 async function checkUpdate(){
