@@ -507,7 +507,11 @@ function save(k,v){
 function renderSync(){$('#sync').textContent=Cloud.ready?(Cloud.err?'Could not sync the last change. It is saved on this device.':'Synced to your Claude account'):'Saved on this device'}
 
 /* ---------- state ---------- */
-const TODAY=ymd(new Date());
+let TODAY=ymd(new Date());
+// The app can stay open in the background overnight: roll 'today' forward when the date changes.
+function refreshToday(){const t=ymd(new Date());if(t===TODAY)return;const was=TODAY;TODAY=t;if(S.date===was)goDate(t);else render()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshToday()});
+setInterval(refreshToday,60000);
 const blankDay=()=>({foods:[],water:0,sets:{},kg:{},reps:{},routine:{},habits:{},supps:{},sleep:''});
 const blankProfile=()=>({weights:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},liftLog:{},calAdj:0});
 const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null,photos:null,progSub:null};
@@ -1326,7 +1330,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#1E5BCB;color:#fff;box-shadow:0 8px 24px rgb(0 0 0 / .3)}.ver{font-size:11px;color:var(--muted);text-align:center;padding:2px 0 8px}</style>
 <script>
-const APP_VERSION='8538357b30';
+const APP_VERSION='6e9ce40b51';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 (()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('.wrap');w&&w.appendChild(v)})();
 async function checkUpdate(){
