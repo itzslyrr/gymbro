@@ -782,14 +782,15 @@ function viewFood(){
   <section class="card">
     <div class="row between"><div><div class="eyebrow">${type==='train'?'Training day':'Rest day'}</div><h2 class="num">${r0(tot.k)} / ${t.kcal} kcal</h2></div><div class="row" style="gap:6px"><button class="btn ghost sm" data-a="openAI">AI photo</button><button class="btn sm" data-a="openAdd" data-v="">+ Add</button></div></div>
     <div class="mm num">Protein <i style="color:var(--prot)">${r0(tot.p)}/${t.p}g</i> · Carbs <i style="color:var(--carb)">${r0(tot.c)}/${t.c}g</i> · Fat <i style="color:var(--fat)">${r0(tot.f)}/${t.f}g</i></div>
-    <p class="muted" style="font-size:12.5px">The full plan below adds up to ${r0(plan.k)} kcal, ${r0(plan.p)}g protein, ${r0(plan.c)}g carbs, ${r0(plan.f)}g fat. Tap “Log plan” on a meal when you eat it as written.</p>
+    <p class="muted" style="font-size:12.5px">The full plan below adds up to ${r0(plan.k)} kcal, ${r0(plan.p)}g protein, ${r0(plan.c)}g carbs, ${r0(plan.f)}g fat. Tap “Log plan” on a meal when you eat it as written. Tap any logged food to edit its numbers.</p>
   </section>
   ${meals.map(m=>{
     const es=S.day.foods.filter(e=>e.meal===m.id||m.id==='extra'&&!ids.has(e.meal)),mt=totals(es),items=mealItems(m,type),ps=sumItems(items);
     return `<section class="card meal">
       <div class="mh"><h3>${esc(m.n)}</h3><span class="muted" style="font-size:12px">${esc(m.time)}</span><span class="k num">${r0(mt.k)} kcal</span></div>
       ${items.length?`<p class="plan-hint">Plan: ${items.map(([id,q])=>{const f=foodById(id);return esc(qtyLabel(q)+' × '+f.n+' ('+f.u+')')}).join(', ')} · ${r0(ps.k)} kcal, ${r0(ps.p)}g protein${m.id==='dinner'?'. Swap salmon for lean beef or chicken on other days.':''}</p>`:`<p class="plan-hint">Snacks off-plan, or extra food on days you need more.</p>`}
-      ${es.length?`<div class="list">${es.map(e=>`<div class="li"><div class="t"><b>${esc(e.name)}</b><small class="num">${qtyLabel(e.qty)} × ${esc(e.unit)} · P ${r0(e.p)} · C ${r0(e.c)} · F ${r0(e.f)}</small></div><span class="num" style="font-weight:600">${e.kcal}</span><button class="x" data-a="delFood" data-v="${e.id}" aria-label="Remove ${esc(e.name)}">×</button></div>`).join('')}</div>`:''}
+      ${es.length?`<div class="list">${es.map(e=>`<div class="li" style="flex-wrap:wrap"><button class="t" style="border:0;background:transparent;text-align:left;padding:0" data-a="editEntry" data-v="${e.id}" aria-expanded="${S.editEntry===e.id}"><b>${esc(e.name)}</b><small class="num">${qtyLabel(e.qty)} × ${esc(e.unit)} · P ${r0(e.p)} · C ${r0(e.c)} · F ${r0(e.f)}</small></button><span class="num" style="font-weight:600">${e.kcal}</span><button class="x" data-a="delFood" data-v="${e.id}" aria-label="Remove ${esc(e.name)}">×</button>
+        ${S.editEntry===e.id?`<div class="grid2" style="width:100%;padding-top:8px"><label class="f" style="grid-column:1/-1">Name<input id="ee-n" type="text" value="${esc(e.name)}"></label><label class="f">kcal<input id="ee-k" type="number" inputmode="decimal" value="${e.kcal}"></label><label class="f">Protein g<input id="ee-p" type="number" inputmode="decimal" value="${r1(e.p)}"></label><label class="f">Carbs g<input id="ee-c" type="number" inputmode="decimal" value="${r1(e.c)}"></label><label class="f">Fat g<input id="ee-f" type="number" inputmode="decimal" value="${r1(e.f)}"></label><div class="row" style="grid-column:1/-1"><button class="btn sm" data-a="saveEntry" data-v="${e.id}">Save</button><button class="btn ghost sm" data-a="editEntry" data-v="${e.id}">Cancel</button></div></div>`:''}</div>`).join('')}</div>`:''}
       <div class="row">${items.length?(es.some(e=>isPlanEntry(e,m,type))?`<button class="btn sm" data-a="unlogPlan" data-v="${m.id}">✓ Logged · Undo</button>`:`<button class="btn ghost sm" data-a="logPlan" data-v="${m.id}">Log plan</button>`):''}<button class="btn ghost sm" data-a="openAdd" data-v="${m.id}">+ Food</button>${es.length?`<button class="btn ghost sm" data-a="askSaveMeal" data-v="${m.id}">Save meal</button>`:''}</div>
       ${S.saveMealFor===m.id?`<div class="row"><input id="smName" type="text" placeholder="Name, e.g. My usual breakfast" value="${esc(m.n)}"><button class="btn sm" data-a="saveMeal" data-v="${m.id}">Save</button><button class="btn ghost sm" data-a="cancelSaveMeal">Cancel</button></div>`:''}
     </section>`}).join('')}
@@ -1158,7 +1159,7 @@ function stopScan(){try{Scan.reader&&Scan.reader.reset()}catch(e){}Scan.reader=n
 /* AI meal photo: Claude estimates items, grams and macros */
 const AI_SCHEMA={type:'object',properties:{items:{type:'array',items:{type:'object',properties:{name:{type:'string'},grams:{type:'number'},kcal:{type:'number'},protein:{type:'number'},carbs:{type:'number'},fat:{type:'number'},confidence:{type:'string',enum:['low','medium','high']}},required:['name','grams','kcal','protein','carbs','fat','confidence'],additionalProperties:false}},note:{type:'string'}},required:['items','note'],additionalProperties:false};
 const aiPrompt=note=>`You estimate nutrition from a meal photo for a man on a lean bulk in the UAE.
-List every distinct food and drink you can see as a separate item. Estimate each portion in grams (ml for drinks) from visual cues such as plate size (about 27 cm), cutlery, hands and packaging. Give calories, protein, carbs and fat for that portion, including visible oil, butter, sauces and dressings. When a dish looks like a typical UAE or Middle Eastern restaurant dish (machboos, mandi, shawarma, mixed grill and so on), use typical restaurant preparation. If you can read a nutrition label or a packaged product, use its numbers. Set confidence per item. In "note", say in one or two short sentences what you assumed (for example hidden oil, portion size) or why there are no items if the photo is not food.${note?`\nThe user adds: "${note.slice(0,300)}"`:''}`;
+List every distinct food and drink you can see as a separate item. Estimate each portion in grams (ml for drinks) from visual cues such as plate size (about 27 cm), cutlery, hands and packaging. Give calories, protein, carbs and fat for that portion, including visible oil, butter, sauces and dressings. When a dish looks like a typical UAE or Middle Eastern restaurant dish (machboos, mandi, shawarma, mixed grill and so on), use typical restaurant preparation. If you can read a nutrition label or a packaged product, use its numbers. Set confidence per item. In "note", say in one or two short sentences what you assumed (for example hidden oil, portion size) or why there are no items if the photo is not food.${note?`\nThe user adds: "${note.slice(0,900)}"`:''}`;
 const blobToB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(b)});
 async function aiBackend(){
   if(window.claude&&window.claude.use){try{const s=await window.claude.use('sample');const caps=s&&await s.limits().catch(()=>null);if(caps&&caps.images)return{type:'claude',s}}catch(e){}}
@@ -1192,12 +1193,15 @@ async function analyzeMeal(blob,note){
   if(res.stop_reason==='max_tokens')throw{msg:'The answer was cut off. Try again.'};
   try{return JSON.parse(res.content.filter(b=>b.type==='text').map(b=>b.text).join(''))}catch(e){throw{msg:'The AI answer could not be read. Try again.'}}
 }
-async function runAI(file){
+async function runAI(file,fix){
   const sh=S.sheet;if(!sh)return;
-  Object.assign(sh,{mode:'ai',ai:{step:'busy',preview:null,items:[],note:''},err:''});
+  const prev=fix&&sh.ai?sh.ai:null;
+  Object.assign(sh,{mode:'ai',ai:{step:'busy',preview:prev?prev.preview:null,blob:prev?prev.blob:null,items:[],note:''},err:''});
   try{
-    const blob=await shrinkImage(file);sh.ai.preview=URL.createObjectURL(blob);renderSheet();
-    const out=await analyzeMeal(blob,($('#aiNote')||{}).value||sh.aiNote||'');
+    const blob=prev&&prev.blob?prev.blob:await shrinkImage(file);sh.ai.blob=blob;if(!sh.ai.preview)sh.ai.preview=URL.createObjectURL(blob);renderSheet();
+    let note=($('#aiNote')||{}).value||sh.aiNote||'';
+    if(prev)note=(note?note+'\n':'')+`Your previous estimate was: ${prev.items.map(i=>{const s=aiScaled(i);return `${i.name} ${r0(+i.grams||0)} g (${s.k} kcal, P ${s.p})`}).join('; ')}. The user corrects it: "${fix}". Redo the whole list with this correction applied.`;
+    const out=await analyzeMeal(blob,note);
     sh.ai.items=(out.items||[]).filter(i=>i&&i.name).map(i=>({...i,on:true,base:{g:Math.max(1,+i.grams||100),k:+i.kcal||0,p:+i.protein||0,c:+i.carbs||0,f:+i.fat||0}}));
     sh.ai.note=out.note||'';sh.ai.step='review';
   }catch(e){sh.ai.step='error';sh.err=(e&&e.msg)||'Something went wrong. Try again.';if(e&&e.setup)sh.ai.needKey=true}
@@ -1271,8 +1275,11 @@ function sheetAI(){
     return `<div class="card">${ai.preview?`<img class="aiimg" src="${ai.preview}" alt="Your meal">`:''}
       <div class="row between"><b>Found ${ai.items.length} item${ai.items.length===1?'':'s'}</b><span class="num" style="font-weight:700">${r0(tot.k)} kcal · P ${r0(tot.p)}</span></div>
       ${ai.note?`<p class="muted" style="font-size:12.5px">${esc(ai.note)}</p>`:''}
-      <div class="list">${ai.items.map((it,i)=>{const s=aiScaled(it);return `<div class="li"><button class="check ${it.on?'on':''}" data-a="aiToggle" data-v="${i}" aria-label="Include ${esc(it.name)}"></button><div class="t"><b>${esc(it.name)}${it.confidence==='low'?' <span class="chip warn" style="padding:1px 7px;font-size:10px">unsure</span>':''}</b><small class="num">${s.k} kcal · P ${s.p} · C ${s.c} · F ${s.f}</small></div><input id="aig-${i}" type="number" inputmode="decimal" class="kg" style="width:74px!important" value="${r0(+it.grams||0)}" data-c="aig" data-v="${i}" aria-label="${esc(it.name)} grams"><span class="muted" style="font-size:12px">g</span></div>`}).join('')}</div>
-      <p class="muted" style="font-size:12px">These are AI estimates. Fix the grams if you know better; untick anything that isn't yours.</p>
+      <div class="list">${ai.items.map((it,i)=>{const s=aiScaled(it),ed=ai.edit===i;return `<div class="li" style="flex-wrap:wrap"><button class="check ${it.on?'on':''}" data-a="aiToggle" data-v="${i}" aria-label="Include ${esc(it.name)}"></button><div class="t"><b>${esc(it.name)}${it.confidence==='low'?' <span class="chip warn" style="padding:1px 7px;font-size:10px">unsure</span>':''}${it.edited?' <span class="chip" style="padding:1px 7px;font-size:10px">edited</span>':''}</b><small class="num">${s.k} kcal · P ${s.p} · C ${s.c} · F ${s.f}</small></div><input id="aig-${i}" type="number" inputmode="decimal" class="kg" style="width:68px!important" value="${r0(+it.grams||0)}" data-c="aig" data-v="${i}" aria-label="${esc(it.name)} grams"><span class="muted" style="font-size:12px">g</span><button class="demo-btn" data-a="aiEdit" data-v="${i}" aria-expanded="${ed}">${ed?'Done':'Edit'}</button>
+        ${ed?`<div class="grid2" style="width:100%;padding-top:8px"><label class="f" style="grid-column:1/-1">Name<input id="aie-n-${i}" type="text" value="${esc(it.name)}" data-c="aie" data-v="${i}" data-f="name"></label><label class="f">kcal<input id="aie-k-${i}" type="number" inputmode="decimal" value="${s.k}" data-c="aie" data-v="${i}" data-f="k"></label><label class="f">Protein g<input id="aie-p-${i}" type="number" inputmode="decimal" value="${s.p}" data-c="aie" data-v="${i}" data-f="p"></label><label class="f">Carbs g<input id="aie-c-${i}" type="number" inputmode="decimal" value="${s.c}" data-c="aie" data-v="${i}" data-f="c"></label><label class="f">Fat g<input id="aie-f-${i}" type="number" inputmode="decimal" value="${s.f}" data-c="aie" data-v="${i}" data-f="f"></label><button class="btn ghost sm" style="grid-column:1/-1;justify-self:start" data-a="aiRemove" data-v="${i}">Remove item</button></div>`:''}</div>`}).join('')}</div>
+      <button class="btn ghost sm" style="justify-self:start" data-a="aiAddItem">+ Add a missed item</button>
+      <p class="muted" style="font-size:12px">These are AI estimates. Change the grams and the numbers scale. Tap Edit to type exact calories and macros, for example from a menu or label.</p>
+      <div class="callout" style="gap:8px"><b>Tell the AI what's wrong</b><input id="aiFix" type="text" placeholder="e.g. it's turkey not chicken, rice was 2 cups" data-c="aiFix" value="${esc(sh.aiFix||'')}"><button class="btn ghost sm" style="justify-self:start" data-a="aiRedo">Ask AI again</button></div>
       <div class="row"><label class="btn ghost" for="aiFile">Retake</label><button class="btn" style="flex:1" data-a="aiAdd" ${on.length?'':'disabled'}>Add ${on.length} to ${esc(mealName(sh.meal))}</button></div>
       <input id="aiFile" type="file" accept="image/*" capture="environment" data-c="aiFile" hidden></div>`;
   }
@@ -1393,6 +1400,18 @@ const actions={
   saveKey(){const k=($('#keyIn').value||'').trim();if(!/^sk-ant-/.test(k)){S.sheet.err='That does not look like an Anthropic key. It starts with sk-ant-.';renderSheet();return}try{localStorage.setItem(KEY_LS,k)}catch(e){}Object.assign(S.sheet,{ai:{step:'start'},err:''});renderSheet()},
   delKey(){try{localStorage.removeItem(KEY_LS)}catch(e){}Object.assign(S.sheet,{ai:{step:'key'},err:''});renderSheet()},
   aiToggle(v){const it=S.sheet.ai.items[+v];it.on=!it.on;renderSheet()},
+  aiEdit(v){const ai=S.sheet.ai;ai.edit=ai.edit===+v?null:+v;renderSheet()},
+  aiRemove(v){const ai=S.sheet.ai;ai.items.splice(+v,1);ai.edit=null;renderSheet()},
+  aiAddItem(){const ai=S.sheet.ai;ai.items.push({name:'Missed item',grams:100,confidence:'high',on:true,edited:true,base:{g:100,k:0,p:0,c:0,f:0}});ai.edit=ai.items.length-1;renderSheet()},
+  aiRedo(){const fix=(($('#aiFix')||{}).value||S.sheet.aiFix||'').trim();if(!fix){S.sheet.err='Type what the AI got wrong first.';renderSheet();return}S.sheet.aiFix='';runAI(null,fix)},
+  editEntry(v){S.editEntry=S.editEntry===v?null:v;render()},
+  saveEntry(v){
+    const e=S.day.foods.find(x=>x.id===v);if(!e)return;
+    const g=k=>{const n=parseFloat(($('#ee-'+k)||{}).value);return isNaN(n)?null:Math.max(0,n)};
+    const nm=(($('#ee-n')||{}).value||'').trim();if(nm)e.name=nm.slice(0,60);
+    if(g('k')!=null)e.kcal=r0(g('k'));['p','c','f'].forEach(k=>{if(g(k)!=null)e[k]=r1(g(k))});
+    S.editEntry=null;saveDay();render();
+  },
   aiAdd(){
     const sh=S.sheet;sh.ai.items.filter(i=>i.on).forEach(it=>{const s=aiScaled(it);S.day.foods.push({id:uid(),fid:'ai',name:it.name,unit:r0(+it.grams||0)+' g (AI)',meal:sh.meal,qty:1,kcal:s.k,p:s.p,c:s.c,f:s.f})});
     saveDay();S.sheet=null;render();
@@ -1463,12 +1482,19 @@ document.addEventListener('input',ev=>{
   if(c==='search'){S.sheet.q=el.value;clearTimeout(searchT);searchT=setTimeout(()=>{const pos=el.selectionStart;renderSheet();const i=$('#foodSearch');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}},120)}
   if(c==='qty'){S.sheet.qty=Number(el.value)||0}
   if(c==='aiNote'){S.sheet.aiNote=el.value}
+  if(c==='aiFix'){S.sheet.aiFix=el.value}
 });
 document.addEventListener('change',ev=>{
   const el=ev.target,c=el.dataset.c;
   if(c==='qty'){S.sheet.qty=Math.max(0.25,Number(el.value)||1);renderSheet()}
   if(c==='amt'){const a=amtInfo(pickedFood());S.sheet.qty=Math.max(1,Number(el.value)||a.base)/a.base;renderSheet()}
   if(c==='aig'){const it=S.sheet.ai.items[+el.dataset.v];it.grams=Math.max(0,Number(el.value)||0);renderSheet()}
+  if(c==='aie'){
+    const it=S.sheet.ai.items[+el.dataset.v],f=el.dataset.f;
+    if(f==='name'){it.name=el.value.trim().slice(0,60)||it.name}
+    else{const cur=aiScaled(it),v=Math.max(0,Number(el.value)||0);cur[f]=f==='k'?r0(v):r1(v);it.base={g:Math.max(1,+it.grams||1),...cur};it.edited=true}
+    renderSheet();
+  }
   if(c==='aiFile'&&el.files[0])runAI(el.files[0]);
   if(c==='sleep'){S.day.sleep=el.value;saveDay()}
   if(c==='cmpA'||c==='cmpB'){S[c]=el.value;render()}
@@ -1504,7 +1530,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#1E5BCB;color:#fff;box-shadow:0 8px 24px rgb(0 0 0 / .3)}.ver{font-size:11px;color:var(--muted);text-align:center;padding:2px 0 8px}</style>
 <script>
-const APP_VERSION='a9b2ff9fe7';
+const APP_VERSION='969b61d16f';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 (()=>{const v=document.createElement('div');v.className='ver';v.textContent='Version '+APP_VERSION;const w=document.querySelector('div.wrap');w&&w.appendChild(v)})();
 async function checkUpdate(){
