@@ -1,5 +1,5 @@
 // Offline cache for GYMBRO. The version changes on every build, so phones pick up updates.
-const CACHE = 'gymbro-3cfe9f85c8';
+const CACHE = 'gymbro-a5a625e2fb';
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "mus/abduct.jpg", "mus/abs.jpg", "mus/biceps.jpg", "mus/calves.jpg", "mus/cardio.jpg", "mus/chest.jpg", "mus/fdelt.jpg", "mus/forearms.jpg", "mus/glutes.jpg", "mus/hams.jpg", "mus/lats.jpg", "mus/lowback.jpg", "mus/neck.jpg", "mus/obliques.jpg", "mus/quads.jpg", "mus/rdelt.jpg", "mus/sdelt.jpg", "mus/triceps.jpg", "mus/upback.jpg"];
 
 self.addEventListener('install', e => {

@@ -14,6 +14,7 @@
 <link rel="icon" href="icon-192.png?v=2">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px;font-family:system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head><body>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -299,6 +300,7 @@ nav.tabbar button svg{width:22px;height:22px}
 nav.tabbar button.on{color:var(--brand)}
 nav.tabbar button.on svg{stroke-width:2.2}
 img.broken{visibility:hidden;background:var(--surface-2)}
+#ghCard{scroll-margin-top:90px}
 .sync{font-size:11px;color:var(--muted);text-align:center;padding-top:4px}
 @media (max-width:380px){.hero{grid-template-columns:1fr;justify-items:center}.macros{width:100%}.stats{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.demo img+img{animation:none;opacity:0}}
@@ -789,14 +791,14 @@ async function load(k){
   }catch(e){return local}
 }
 function save(k,v){
-  latest[k]=v;lsSet(k,v);
+  latest[k]=v;lsSet(k,v);ghQueue();
   if(!Cloud.ready)return;
   clearTimeout(timers[k]);
   timers[k]=setTimeout(()=>{
     chains[k]=(chains[k]||Promise.resolve()).then(()=>ref(k).set(latest[k])).then(()=>{Cloud.err=false;renderSync()}).catch(()=>{Cloud.err=true;renderSync()});
   },700);
 }
-function renderSync(){$('#sync').textContent=(Cloud.ready?(Cloud.err?'Could not sync the last change. It is saved on this device.':'Synced to your Claude account'):(Cloud.why==='nohost'?'Saved on this phone':'Not connected to your Claude account · saved on this device only'))+' · '+APP_VERSION}
+function renderSync(){$('#sync').textContent=(Cloud.ready?(Cloud.err?'Could not sync the last change. It is saved on this device.':'Synced to your Claude account'):(Cloud.why==='nohost'?ghStatus():'Not connected to your Claude account · saved on this device only'))+' · '+APP_VERSION}
 
 /* ---------- state ---------- */
 let TODAY=ymd(new Date());
@@ -855,6 +857,7 @@ function viewToday(){
   const glasses=14;
   const nm=S.profile.name;
   return `
+  ${Cloud.why==='nohost'&&!ghCfg()?`<section class="card callout-card"><div class="row between"><div><h3>Turn on automatic backup</h3><p class="muted" style="font-size:12.5px;margin:2px 0 0">Your logs are only on this phone. One-minute setup keeps a copy in your private GitHub.</p></div><button class="btn sm" data-a="ghOpen">Set up</button></div></section>`:''}
   ${nm?'':`<section class="card"><h3>What should I call you?</h3><div class="row"><input id="nameIn" type="text" placeholder="Your first name" autocomplete="given-name"><button class="btn" data-a="saveName">Save</button></div></section>`}
   <section class="card">
     <div class="row between"><div><div class="eyebrow">${nm?esc(nm)+' · ':''}${dayType(S.date)==='train'?'Training day':'Rest day'} target</div><h2>${esc(p.name)} day</h2></div>
@@ -1913,7 +1916,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v19 · 12 Nov 2026';
+const APP_VERSION='v20 · 13 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -1930,6 +1933,7 @@ function viewMore(){
   if(sub==='about')return back('About & data')+`<section class="card"><div class="row"><img src="${LOGO}" alt="" width="56" height="56" style="border-radius:14px"><div><h3>GYMBRO</h3><p class="muted num" style="font-size:13px">${esc(APP_VERSION)}</p></div></div>
     <p style="font-size:13.5px">${Cloud.ready?'Your data syncs to your Claude account, so it is the same on your phone and computer.'+(Cloud.moved?` ${Cloud.moved} records from this phone were just copied to your account.`:''):Cloud.why==='nohost'?'This is the home-screen app. Your data is saved on this phone, so use Copy data or Save backup now and then to keep a spare copy.':'Not connected to your Claude account, so pictures and synced progress cannot load here. Open GYMBRO inside the Claude app (not Safari) from its artifact link.'}</p>
     <p class="muted num" style="font-size:12px">Storage check: ${Cloud.ready?'account connected':'not connected ('+esc(Cloud.why||'waiting')+')'} · ${localKeys().length} records on this device</p>    <p class="muted" style="font-size:12.5px">Not seeing the latest features on your phone? Open GYMBRO from its artifact link (not from an old chat), then close and reopen the Claude app. This page should show ${esc(APP_VERSION)}.</p></section>
+    ${Cloud.why==='nohost'?viewGhBackup():''}
     <section class="card"><h3>Move or back up your progress</h3>
     <p class="muted" style="font-size:13px">Copy data puts all your logs, weights, lifts and plan edits on the clipboard. Open GYMBRO where you want them, tap Paste data, and they are merged in. Save backup makes a file instead.</p>
     ${S.backupMsg?`<p style="font-size:13px;font-weight:600">${esc(S.backupMsg)}</p>`:''}
@@ -2166,6 +2170,10 @@ const actions={
   async doMove(){const src=S.date,to=S.moveTo;S.confirm=null;S.moveTo=null;if(!to||to===src)return;await moveDay(src,to);await goDate(to)},
   cancelConfirm(){S.confirm=null;render()},
   resetGrocery(){S.profile.grocery={};S.confirm=null;saveProfile();render()},
+  ghOpen(){S.tab='more';S.moreSub='about';render();setTimeout(()=>{const e=$('#ghCard');e&&e.scrollIntoView({block:'start'})},50)},
+  async ghConnect(){const t=(($('#ghToken')||{}).value||'').trim();if(!/^(ghp_|github_pat_|gho_)/.test(t)){S.ghMsg='That does not look like a GitHub token. It starts with ghp_ or github_pat_.';render();return}S.ghMsg='Connecting…';render();S.ghMsg=await ghConnect(t);render()},
+  async ghNow(){S.ghMsg='Backing up…';render();await ghPush();S.ghMsg='';render()},
+  ghOff(){try{localStorage.removeItem(GH_LS)}catch(e){}S.ghMsg='Automatic backup turned off on this phone. Your backup on GitHub is kept.';render()},
   async copyData(){
     const txt=JSON.stringify(backupObj()),n=Object.keys(backupObj().data).length,box=$('#pasteBox');
     let ok=false;try{await navigator.clipboard.writeText(txt);ok=true}catch(e){}
@@ -2249,6 +2257,90 @@ document.addEventListener('change',ev=>{
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan();S.sheet=null;renderSheet()}if(ev.key==='Enter'&&ev.target.id==='foodSearch'&&S.sheet&&(S.sheet.q||'').trim().length>=2)searchOnline(S.sheet.q.trim());if(ev.key==='Enter'&&ev.target.id==='weightIn')actions.saveWeight();if(ev.key==='Enter'&&ev.target.id==='nameIn')actions.saveName()});
 
+/* ---------- automatic backup to a private GitHub gist (home-screen app only) ---------- */
+// The token and gist id stay outside the gymbro: prefix, so they are never inside a backup.
+const GH_LS='gymbro-gh',GH_FILE='gymbro-data.json';
+const ghCfg=()=>{try{return JSON.parse(localStorage.getItem(GH_LS))||null}catch(e){return null}};
+const ghSet=patch=>{const c={...(ghCfg()||{}),...patch};try{localStorage.setItem(GH_LS,JSON.stringify(c))}catch(e){}return c};
+async function ghApi(path,opt={},token){
+  const r=await fetch('https://api.github.com'+path,{...opt,headers:{Authorization:'Bearer '+(token||ghCfg().token),Accept:'application/vnd.github+json','Content-Type':'application/json'}});
+  if(!r.ok)throw{status:r.status};return r.json();
+}
+async function ghRead(g){const f=g.files&&g.files[GH_FILE];if(!f)return null;const txt=f.truncated?await (await fetch(f.raw_url)).text():f.content;try{const b=JSON.parse(txt);return b&&b.app==='gymbro'?b:null}catch(e){return null}}
+// Pull only what this phone is missing, so a deleted entry here never comes back from the backup.
+async function ghFill(b){
+  let n=0;if(!b||!b.data)return 0;
+  for(const[k,v]of Object.entries(b.data)){if(v==null||typeof v!=='object')continue;const cur=lsGet(k);
+    if(cur==null||(k.startsWith('day-')&&!dayHas(cur)&&dayHas(v))){save(k,v);n++}}
+  if(n){S.dayCache={};S.repData=null;await loadProfile();await loadDay();scheduleStreaks()}
+  return n;
+}
+async function ghConnect(token){
+  try{
+    await ghApi('/user',{},token);
+    let gist=null;
+    for(let page=1;page<=5&&!gist;page++){const list=await ghApi('/gists?per_page=100&page='+page,{},token);gist=list.find(g=>g.files&&g.files[GH_FILE]);if(list.length<100)break}
+    let pulled=0;
+    if(gist){ghSet({token,gist:gist.id});pulled=await ghFill(await ghRead(await ghApi('/gists/'+gist.id)))}
+    else{const g=await ghApi('/gists',{method:'POST',body:JSON.stringify({description:'GYMBRO backup (private, updated automatically)',public:false,files:{[GH_FILE]:{content:JSON.stringify(backupObj())}}})},token);ghSet({token,gist:g.id,last:Date.now(),err:''})}
+    await ghPush();
+    return 'Automatic backup is on.'+(pulled?` ${pulled} records were restored from your backup.`:'');
+  }catch(e){return e&&e.status===401?'GitHub rejected that token. Make a new one and paste it again.':e&&e.status===403||e&&e.status===404?'That token cannot make gists. Tick the "gist" box when you create it.':'Could not reach GitHub. Check your internet and try again.'}
+}
+let ghT=null,ghBusy=false,ghAgain=false;
+function ghQueue(){if(!ghCfg())return;clearTimeout(ghT);ghT=setTimeout(ghPush,6000)}
+async function ghPush(){
+  const c=ghCfg();if(!c||!c.gist)return;
+  clearTimeout(ghT);if(ghBusy){ghAgain=true;return}ghBusy=true;
+  try{await ghApi('/gists/'+c.gist,{method:'PATCH',body:JSON.stringify({files:{[GH_FILE]:{content:JSON.stringify(backupObj())}}})});ghSet({last:Date.now(),err:''})}
+  catch(e){ghSet({err:e&&e.status===401?'token':e&&e.status===404?'gone':'net'})}
+  ghBusy=false;renderSync();
+  if(ghAgain){ghAgain=false;ghPush()}
+}
+function ghStatus(){
+  const c=ghCfg();if(!c)return 'Saved on this phone only · backup is off';
+  if(c.err)return c.err==='token'?'Backup paused: GitHub token expired. Fix it in More › About & data':c.err==='gone'?'Backup paused: backup file missing. Reconnect in More › About & data':'Saved on this phone · backup will retry when online';
+  if(!c.last)return 'Backing up…';
+  const m=Math.round((Date.now()-c.last)/60000);
+  return 'Backed up to GitHub '+(m<1?'just now':m<60?m+' min ago':new Date(c.last).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}));
+}
+function viewGhBackup(){
+  const c=ghCfg();
+  const msg=S.ghMsg?`<p style="font-size:13px;font-weight:600">${esc(S.ghMsg)}</p>`:'';
+  if(c&&c.gist)return `<section class="card" id="ghCard"><h3>Automatic backup</h3><p style="font-size:13.5px">${esc(ghStatus())}.</p>
+    <p class="muted" style="font-size:12.5px">Every change you make is copied to a private file on your GitHub a few seconds later, and GitHub keeps every earlier version. If you lose this phone or delete the icon, connect again with a token and everything comes back.</p>${msg}
+    <div class="row" style="gap:8px"><button class="btn sm" data-a="ghNow">Back up now</button><a class="btn ghost sm" href="https://gist.github.com/${esc(c.gist)}" target="_blank" rel="noopener">View on GitHub</a><button class="btn ghost sm" data-a="ghOff">Turn off</button></div></section>`;
+  return `<section class="card" id="ghCard"><h3>Turn on automatic backup</h3>
+    <p class="muted" style="font-size:13px">Saves everything to a private file on your GitHub after every change. Only you can see it. One-time setup:</p>
+    <ol style="font-size:13.5px;padding-left:20px;margin:8px 0">
+      <li>Tap <b>Make a key</b>. Sign in to GitHub if asked.</li>
+      <li>Set <b>Expiration</b> to <b>No expiration</b>. The <b>gist</b> box is already ticked. Scroll down and tap <b>Generate token</b>.</li>
+      <li>Copy the key (it starts with ghp_), come back here, paste it below and tap <b>Connect</b>.</li></ol>
+    <a class="btn ghost sm" href="https://github.com/settings/tokens/new?scopes=gist&description=GYMBRO%20backup" target="_blank" rel="noopener">Make a key</a>
+    <div class="row" style="gap:8px;margin-top:10px"><input id="ghToken" type="password" autocomplete="off" placeholder="Paste key: ghp_…" style="flex:1"><button class="btn sm" data-a="ghConnect">Connect</button></div>
+    ${msg}<p class="muted" style="font-size:12px">If you set GYMBRO up again on a new phone, use the same steps and your data is restored automatically.</p></section>`;
+}
+// Back up straight away when the app goes to the background, and refresh the "backed up" time.
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&ghT)ghPush()});
+setInterval(()=>{if(ghCfg())renderSync()},60000);
+
+/* ---------- one-time fill: the days lost when the old app was deleted, marked fully done ---------- */
+const FILL_FROM='2026-11-08',FILL_TO='2026-11-12',FILL_FLAG='gymbro-filled-2026-11-08';
+async function fillPastDays(){
+  try{if(localStorage.getItem(FILL_FLAG))return}catch(e){return}
+  for(let d=FILL_FROM;d<=FILL_TO;d=addDays(d,1)){
+    const cur=await load(dayKey(d));if(dayHas(cur))continue;
+    const type=dayType(d),day=blankDay();
+    mealsFor(d).forEach(m=>mealItems(m,type).forEach(([id,q])=>{const f=foodById(id);if(f)day.foods.push(entryFrom(f,q,m.id,true))}));
+    dayPlan(d).blocks.forEach(b=>b.items.forEach(e=>{day.sets[e.id]=Array(e.s).fill(true)}));
+    ROUTINE.forEach(([k])=>day.routine[k]=true);HABITS.forEach(([k])=>day.habits[k]=true);
+    day.supps={creatine:true,mag:true};day.water=14;
+    save(dayKey(d),day);
+  }
+  try{localStorage.setItem(FILL_FLAG,'1')}catch(e){}
+  S.dayCache={};S.repData=null;await loadDay();
+}
+
 /* ---------- move data between devices ---------- */
 function backupObj(){const out={app:'gymbro',version:1,exported:new Date().toISOString(),data:{}};localKeys().forEach(k=>{const v=lsGet(k);if(v!=null)out.data[k]=v});return out}
 const dayHas=d=>!!d&&((d.foods&&d.foods.length)||Object.keys(d.sets||{}).length||d.water||Object.keys(d.kg||{}).length);
@@ -2276,16 +2368,17 @@ document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'
   loadPhotos().then(()=>{if(S.tab==='progress'||S.tab==='today')render()});
   await initCloud();
   if(Cloud.ready){await migrateLocal();S.dayCache={};S.repData=null;await loadProfile();await loadDay();render()}
-  else render();
-  await computeStreaks();if(S.tab==='today')render();
+  else{if(Cloud.why==='nohost'&&ghCfg()&&ghCfg().gist){try{await ghFill(await ghRead(await ghApi('/gists/'+ghCfg().gist)))}catch(e){}ghPush()}render()}
+  await fillPastDays();
+  await computeStreaks();render();
 })();
 </script>
 
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='3cfe9f85c8'
-const BUILD_ID='3cfe9f85c8';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='a5a625e2fb'
+const BUILD_ID='a5a625e2fb';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{
