@@ -322,9 +322,12 @@ img.broken{visibility:hidden;background:var(--surface-2)}
 <nav class="tabbar"><div class="in" id="tabbar"></div></nav>
 
 <script>
+// The public demo (gymbro/demo/) sets window.GYMBRO_DEMO: friends set up their own stats and nothing personal is shown.
+const DEMO=!!window.GYMBRO_DEMO,ASSET=DEMO?'../':'';
+if(DEMO){const b=document.querySelector('.brand small');if(b)b.textContent='YOUR PLAN'}
 /* ---------- report baseline (Dr. Nutrition body composition, 2026-07-28) ---------- */
 const REPORT={date:'2026-07-28',age:28,height:181,weight:66.6,stdWeight:72.1,fatKg:3.2,lbm:63.4,slm:59.4,bmr:1659,tee:2555,bmi:20.3,whr:0.65};
-const GOAL={weight:72.1,stretch:75,rateLo:0.25,rateHi:0.35};
+const GOAL={weight:72.1,stretch:75,rateLo:0.25,rateHi:0.35,dir:1};
 
 /* ---------- calorie targets ---------- */
 const TARGET={train:{kcal:3100,p:180,c:400,f:90},rest:{kcal:2750,p:170,c:310,f:95}};
@@ -501,7 +504,7 @@ const EX_MUS={
  lpress2:['glutes','hams','quads'],gbridge:['glutes','hams'],llcurl:['hams'],slext:['quads'],abduct:['abduct','glutes'],lpcalf:['calves'],
 };
 const musOf=e=>(Array.isArray(e.m)?e.m:EX_MUS[e.id]||[]).filter(k=>MUSCLES[k]);
-const musPic=k=>'mus/'+k+'.jpg';
+const musPic=k=>ASSET+'mus/'+k+'.jpg';
 const daysBetween=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
 const cycleIdx=s=>{const n=CYCLE.length;return((daysBetween(START,s)%n)+n)%n};
 const planKey=s=>s<START?'prep':CYCLE[cycleIdx(s)];
@@ -524,7 +527,7 @@ const exVideo=e=>yt((!e.renamed&&VQ[e.id])||e.n.replace(/\(.*?\)/g,'')+' proper 
 // A renamed exercise is usually a different move, so it drops the stock demo frames.
 const imgOf=e=>e.img||IMG[e.id]||'';
 const hasDemo=e=>!!imgOf(e)&&!e.renamed;
-const demoSlug=s=>s?`<div class="demo"><img src="ex/${s}-0.jpg" alt="Start position" loading="lazy"><img src="ex/${s}-1.jpg" alt="End position" loading="lazy"></div>`:'';
+const demoSlug=s=>s?`<div class="demo"><img src="${ASSET}ex/${s}-0.jpg" alt="Start position" loading="lazy"><img src="${ASSET}ex/${s}-1.jpg" alt="End position" loading="lazy"></div>`:'';
 const demo=id=>demoSlug(IMG[id]);
 
 /* ---------- ranked exercise library ----------
@@ -749,7 +752,7 @@ function totals(foods){return foods.reduce((a,e)=>{a.k+=e.kcal;a.p+=e.p;a.c+=e.c
 const qtyLabel=q=>(Math.round(q*100)/100).toString();
 
 /* ---------- storage: your Claude account when available, this device otherwise ---------- */
-const LS='gymbro:';
+const LS=DEMO?'gymbrodemo:':'gymbro:';
 const lsGet=k=>{try{return JSON.parse(localStorage.getItem(LS+k))}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(LS+k,JSON.stringify(v))}catch(e){}};
 const Cloud={db:null,uid:null,ready:false,err:false,why:'',moved:0};
@@ -807,7 +810,7 @@ function refreshToday(){const t=ymd(new Date());if(t===TODAY)return;const was=TO
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshToday()});
 setInterval(refreshToday,60000);
 const blankDay=()=>({foods:[],water:0,sets:{},kg:{},reps:{},routine:{},habits:{},supps:{},sleep:''});
-const blankProfile=()=>({weights:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},liftLog:{},calAdj:0});
+const blankProfile=()=>({weights:DEMO?{}:{[REPORT.date]:REPORT.weight},customFoods:[],grocery:{},lifts:{},liftLog:{},calAdj:0});
 const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null,photos:null,progSub:null,dayCache:{},streaks:null,repData:null};
 try{const t=localStorage.getItem(LS+'tab');if(t)routeTab(t)}catch(e){}
 const dayKey=s=>'day-'+s;
@@ -1088,7 +1091,7 @@ function viewTrain(){
 function weekStrip(sel){
   const cur=planKey(S.date),base=S.date<START?START:addDays(S.date,-cycleIdx(S.date));
   return `<section class="card">
-    <div class="row between"><div class="eyebrow">${aiActive()?esc(S.profile.aiPlan.title):'Back-safe plan · 8-day cycle'}</div>${cur==='prep'?'<span class="chip">Starts tomorrow</span>':`<span class="chip num">Day ${cycleIdx(S.date)+1} of ${CYCLE.length}</span>`}</div>
+    <div class="row between"><div class="eyebrow">${aiActive()?esc(S.profile.aiPlan.title):(DEMO?'Starter plan · 8-day cycle':'Back-safe plan · 8-day cycle')}</div>${cur==='prep'?'<span class="chip">Starts tomorrow</span>':`<span class="chip num">Day ${cycleIdx(S.date)+1} of ${CYCLE.length}</span>`}</div>
     <div class="week">${CYCLE.map((k,i)=>{const d=addDays(base,i),dd=parse(d);return `<button class="${k===sel?'on':''} ${d===TODAY?'today':''}" data-a="trainDay" data-v="${k}"><b>${esc(PLANS[k].name)}</b><span>${DOW[dd.getDay()]} ${dd.getDate()}</span></button>`}).join('')}</div>
   </section>`;
 }
@@ -1209,7 +1212,7 @@ function viewLibrary(){
   const row=x=>{const id=x.g+':'+x.rank,open=S.libOpen===id,add=S.libAdd===id;
     return `<div class="lrow" data-name="${esc((x.n+' '+x.m.map(k=>MUSCLES[k]).join(' ')).toLowerCase())}">
       <div class="lhead"><span class="rk ${x.rank<=3?'top':''}" aria-label="Rank ${x.rank}">${x.rank}</span>
-        <button class="lthumb" data-a="libOpen" data-v="${id}" aria-expanded="${open}" aria-label="${open?'Hide':'Show'} demo for ${esc(x.n)}">${x.img?`<img src="ex/${x.img}-0.jpg" alt="" loading="lazy">`:'<span>Video</span>'}</button>
+        <button class="lthumb" data-a="libOpen" data-v="${id}" aria-expanded="${open}" aria-label="${open?'Hide':'Show'} demo for ${esc(x.n)}">${x.img?`<img src="${ASSET}ex/${x.img}-0.jpg" alt="" loading="lazy">`:'<span>Video</span>'}</button>
         <div class="t"><b>${esc(x.n)}</b><small>${x.m.map(k=>esc(MUSCLES[k])).join(' · ')}</small>${x.back?'<span class="chip warn" style="margin-top:3px;padding:2px 8px;font-size:11px">Loads lower back</span>':''}</div>
         <button class="demo-btn" data-a="libAdd" data-v="${id}" aria-expanded="${add}">${add?'Cancel':'+ Add'}</button></div>
       ${open?`${x.img?demoSlug(x.img):''}${vlink(yt(x.n+' proper form'))}`:''}
@@ -1249,7 +1252,8 @@ const POSE3=[['front','Front'],['side','Side'],['back','Back']];
 const lbl=(arr,k)=>(arr.find(x=>x[0]===k)||[k,k])[1];
 function coachDefaults(){
   const prev=S.profile.coachInputs||{};
-  return{goal:'leanbulk',focus:[],days:5,mins:60,equip:'gym',level:'int',limits:'Lower back: avoid anything that loads the spine (squats, deadlifts, bent-over rows, standing overhead presses, twists).',notes:'',...prev,start:TODAY};
+  const su=DEMO&&S.profile.setup;
+  return{goal:su?{bulk:'leanbulk',cut:'cut',maintain:'recomp'}[su.goal]||'leanbulk':'leanbulk',focus:[],days:su?su.days:5,mins:60,equip:'gym',level:'int',limits:DEMO?'':'Lower back: avoid anything that loads the spine (squats, deadlifts, bent-over rows, standing overhead presses, twists).',notes:'',...prev,start:TODAY};
 }
 function latestWeight(){const w=S.profile.weights,d=Object.keys(w).sort().pop();return d?w[d]:REPORT.weight}
 function coachPrompt(change){
@@ -1260,7 +1264,7 @@ function coachPrompt(change){
   return `You are an elite strength and physique coach (CSCS) with a sports-physiotherapy background. Design a complete, professional training program for this client.
 
 CLIENT
-- Male, ${REPORT.age}, ${REPORT.height} cm, ${latestWeight()} kg now. Body scan on ${REPORT.date}: about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, lean and under the standard weight for his height.
+${DEMO?`- ${S.profile.setup&&S.profile.setup.sex==='f'?'Female':'Male'}, ${REPORT.age}, ${REPORT.height} cm, ${latestWeight()} kg now. Self-reported, no body scan.`:`- Male, ${REPORT.age}, ${REPORT.height} cm, ${latestWeight()} kg now. Body scan on ${REPORT.date}: about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, lean and under the standard weight for his height.`}
 - Goal: ${lbl(GOALS,i.goal)}. Muscles to prioritise: ${i.focus.length?i.focus.map(k=>MUSCLES[k]).join(', '):'none named, decide from the assessment'}.
 - Trains ${i.days} days per week, ${i.mins} minutes per session including warm-up. Equipment: ${lbl(EQUIP,i.equip)}. Experience: ${lbl(LEVELS,i.level)}.
 - Injuries and limits: ${i.limits||'none'}.
@@ -1283,7 +1287,7 @@ RANKED LIBRARY (key | name | muscles, main first | BACK = loads the lower back)
 ${lib}
 
 MEAL PLAN RULES
-- Set daily targets for training days and rest days that fit the goal. His measured total burn is ${REPORT.tee} kcal on a normal day (BMR ${REPORT.bmr}); lifting adds about 200–300. Lean bulk: about 300 kcal surplus. Fat loss: about 400 deficit. Protein 2.0–2.5 g per kg.
+- Set daily targets for training days and rest days that fit the goal. ${DEMO?'Their estimated':'His measured'} total burn is ${REPORT.tee} kcal on a normal day (BMR ${REPORT.bmr}); lifting adds about 200–300. Lean bulk: about 300 kcal surplus. Fat loss: about 400 deficit. Protein 2.0–2.5 g per kg.
 - 5 or 6 meals. Use "when": "train" for pre/post-workout meals that only happen on training days, "rest" for extras only on rest days, otherwise "all". Times as "HH:MM", fitting a typical UAE day.
 - Build every meal ONLY from the FOOD LIST below: "food" is the id exactly, "qty" is the number of servings of the listed serving size (decimals allowed, e.g. 1.5 = 150 g when the serving is 100 g).
 - The "all" meals plus "train" meals should land within 5% of the training-day calories; "all" plus "rest" meals within 5% of the rest-day calories. Hit protein.
@@ -1433,8 +1437,8 @@ function viewFace(){
   </section>
   <section class="callout">
     <b>What actually changes your jawline</b>
-    <p>Your scan shows about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, so there is no face fat to lose. A puffy face at your leanness comes from water: salt swings, poor sleep, alcohol and late salty meals. Definition comes from posture, a stronger neck and chewing muscles, and steady water balance. Bone structure sets the rest.</p>
-    <p>A lean bulk adds a little softness to the face. That is normal, and you will still be lean.</p>
+    <p>${DEMO?'If you are carrying extra body fat, losing it is what sharpens the jaw most. If you are already lean, a':`Your scan shows about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, so there is no face fat to lose. A`} puffy face at your leanness comes from water: salt swings, poor sleep, alcohol and late salty meals. Definition comes from posture, a stronger neck and chewing muscles, and steady water balance. Bone structure sets the rest.</p>
+    ${DEMO?'':'<p>A lean bulk adds a little softness to the face. That is normal, and you will still be lean.</p>'}
   </section>
   ${viewFaceVideos()}`;
 }
@@ -1526,13 +1530,19 @@ function viewProgress(){
 function progWeight(){
   const st=weightStats(),adj=S.profile.calAdj||0;
   let chip='<span class="chip">Log 3+ weigh-ins over a week to see your rate</span>';
-  if(st.rate!==null){
+  if(st.rate!==null&&GOAL.dir<0){
+    if(st.rate>-0.2)chip=`<span class="chip warn">${st.rate.toFixed(2)} kg/week · too slow, take 150 kcal off</span>`;
+    else if(st.rate<-1)chip=`<span class="chip bad">Losing ${r1(-st.rate)} kg/week · too fast, add 150 kcal</span>`;
+    else chip=`<span class="chip ok">Losing ${r1(-st.rate)} kg/week · on track</span>`;
+  }else if(st.rate!==null&&GOAL.dir===0){
+    chip=Math.abs(st.rate)<=0.3?`<span class="chip ok">Steady · on track</span>`:`<span class="chip warn">${st.rate>0?'+':''}${st.rate.toFixed(2)} kg/week · adjust 150 kcal</span>`;
+  }else if(st.rate!==null){
     if(st.rate<0.2)chip=`<span class="chip warn">${st.rate.toFixed(2)} kg/week · too slow, add 150 kcal</span>`;
     else if(st.rate>0.5)chip=`<span class="chip bad">Gaining ${r1(st.rate)} kg/week · too fast, drop 150 kcal</span>`;
     else chip=`<span class="chip ok">Gaining ${r1(st.rate)} kg/week · on track</span>`;
   }
-  const toGo=r1(GOAL.weight-st.avg7);
-  const eta=st.rate&&st.rate>0&&toGo>0?Math.ceil(toGo/st.rate):null;
+  const toGo=r1((GOAL.dir<0?-1:1)*(GOAL.weight-st.avg7));
+  const eta=st.rate&&GOAL.dir&&st.rate*GOAL.dir>0&&toGo>0?Math.ceil(toGo/Math.abs(st.rate)):null;
   const etaD=eta?addDays(TODAY,eta*7):null;
   const todayW=S.profile.weights[S.date];
   return `
@@ -1544,19 +1554,20 @@ function progWeight(){
   <section class="card">
     <div class="stats">
       <div class="stat"><b class="num">${r1(st.avg7)}</b><span>7-day avg (kg)</span></div>
-      <div class="stat"><b class="num">${toGo>0?'+'+toGo:'0'}</b><span>kg to ${GOAL.weight}</span></div>
+      <div class="stat"><b class="num">${toGo>0?(GOAL.dir<0?'−':'+')+toGo:'0'}</b><span>kg to ${GOAL.weight}</span></div>
       <div class="stat"><b class="num">${etaD?MON[parse(etaD).getMonth()]+' '+parse(etaD).getFullYear().toString().slice(2):'—'}</b><span>Goal ETA</span></div>
     </div>
     ${chart()}
   </section>
   <section class="card">
     <div class="row between"><h3>Calorie adjustment</h3><span class="chip num">${adj>0?'+':''}${adj} kcal</span></div>
-    <p class="muted" style="font-size:13px">Aim for ${GOAL.rateLo}–${GOAL.rateHi} kg per week. If the weekly average barely moves for 2 weeks, add 150 kcal (easiest: 150 g cottage cheese before bed, or 50 g more rice). If you gain over 0.5 kg a week, take 150 off. Changes go on top of carbs.</p>
+    <p class="muted" style="font-size:13px">${GOAL.dir<0?`Aim to lose ${GOAL.rateLo}–${GOAL.rateHi} kg per week. If the weekly average barely moves for 2 weeks, take 150 kcal off. If you lose over 1 kg a week, add 150 back. Changes come off carbs first.</p><p hidden>`:GOAL.dir===0?`Keep the weekly average within about 0.3 kg of where you started while your lifts go up. If it drifts up, take 150 kcal off; if it drifts down, add 150.</p><p hidden>`:''}Aim for ${GOAL.rateLo}–${GOAL.rateHi} kg per week. If the weekly average barely moves for 2 weeks, add 150 kcal (easiest: 150 g cottage cheese before bed, or 50 g more rice). If you gain over 0.5 kg a week, take 150 off. Changes go on top of carbs.</p>
     <div class="row"><button class="btn ghost sm" data-a="adj" data-v="-150">− 150</button><button class="btn ghost sm" data-a="adj" data-v="150">+ 150</button>${adj?`<button class="btn ghost sm" data-a="adj" data-v="0">Reset</button>`:''}</div>
     <p class="num" style="font-size:13px">Now: training days ${TARGET.train.kcal+adj} kcal · rest days ${TARGET.rest.kcal+adj} kcal</p>
   </section>`;
 }
 function progScan(){
+  if(DEMO)return demoScan();
   return `
   <section class="card">
     <div class="eyebrow">Dr. Nutrition scan · ${fmtDate(REPORT.date)} 2026</div>
@@ -1684,7 +1695,7 @@ const amtInfo=f=>{const m=/^(\d+(?:\.\d+)?)\s*(g|ml)$/.exec(f.u||'');return m?{b
 const OFF='https://world.openfoodfacts.org';
 const SDK_URL='https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.2.0/+esm';
 const ZXING_URL='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
-const KEY_LS='gymbro-apikey'; // kept outside the gymbro: prefix so backups never include it
+const KEY_LS=DEMO?'gymbrodemo-apikey':'gymbro-apikey'; // kept outside the gymbro: prefix so backups never include it
 const getKey=()=>{try{return localStorage.getItem(KEY_LS)||''}catch(e){return ''}};
 const loadScript=src=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load'));document.head.appendChild(s)});
 function offToFood(p){
@@ -1916,7 +1927,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v20 · 13 Nov 2026';
+const APP_VERSION='v21 · 13 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -1930,7 +1941,7 @@ function viewMore(){
   if(sub==='face')return back('Face & jaw')+viewFace();
   if(sub==='shop')return back('Grocery list')+viewShop();
   if(sub==='ramadan')return back('Ramadan mode')+viewRamadanSetup();
-  if(sub==='about')return back('About & data')+`<section class="card"><div class="row"><img src="${LOGO}" alt="" width="56" height="56" style="border-radius:14px"><div><h3>GYMBRO</h3><p class="muted num" style="font-size:13px">${esc(APP_VERSION)}</p></div></div>
+  if(sub==='about')return back('About & data')+`<section class="card"><div class="row"><img src="${LOGO}" alt="" width="56" height="56" style="border-radius:14px"><div><h3>GYMBRO${DEMO?' demo':''}</h3><p class="muted num" style="font-size:13px">${esc(APP_VERSION)}</p></div></div>${DEMO?`<button class="btn ghost sm" style="margin-top:10px" data-a="setupEdit">Edit my stats and goal</button>`:''}
     <p style="font-size:13.5px">${Cloud.ready?'Your data syncs to your Claude account, so it is the same on your phone and computer.'+(Cloud.moved?` ${Cloud.moved} records from this phone were just copied to your account.`:''):Cloud.why==='nohost'?'This is the home-screen app. Your data is saved on this phone, so use Copy data or Save backup now and then to keep a spare copy.':'Not connected to your Claude account, so pictures and synced progress cannot load here. Open GYMBRO inside the Claude app (not Safari) from its artifact link.'}</p>
     <p class="muted num" style="font-size:12px">Storage check: ${Cloud.ready?'account connected':'not connected ('+esc(Cloud.why||'waiting')+')'} · ${localKeys().length} records on this device</p>    <p class="muted" style="font-size:12.5px">Not seeing the latest features on your phone? Open GYMBRO from its artifact link (not from an old chat), then close and reopen the Claude app. This page should show ${esc(APP_VERSION)}.</p></section>
     ${Cloud.why==='nohost'?viewGhBackup():''}
@@ -1946,6 +1957,8 @@ function viewMore(){
 /* ---------- render ---------- */
 function render(){
   renderHeader();renderTabs();renderSync();
+  if(DEMO&&(!S.profile.setup||S.editSetup)){$('#tabbar').hidden=!S.profile.setup;$('#view').innerHTML=viewSetup();renderSheet();return}
+  $('#tabbar').hidden=false;
   const v={today:viewToday,food:viewFood,train:viewTrain,progress:viewProgress,more:viewMore}[S.tab]||viewToday;
   $('#view').innerHTML=v();
   if(S.tab==='videos'&&(S.vidTab||'lib')==='lib')filterLib();
@@ -1962,6 +1975,7 @@ const aiActive=()=>validAiPlan(S.profile.aiPlan);
 const validMeals=m=>Array.isArray(m)&&m.length>=2&&m.every(x=>x&&typeof x.id==='string'&&x.n&&Array.isArray(x.items)&&x.items.every(it=>Array.isArray(it)&&foodById(it[0])&&it[1]>0));
 const AI_BASE={};
 function rebuildPlans(){
+  if(DEMO)applyDemo();
   const pe=S.profile.planEdits||{};
   // An active AI Coach program replaces the cycle; its days get keys like "ai<id>_<n>", so old edits never leak in.
   Object.keys(PLANS).forEach(k=>{if(AI_BASE[k]){delete PLANS[k];delete AI_BASE[k]}});
@@ -1969,7 +1983,7 @@ function rebuildPlans(){
     const ap=S.profile.aiPlan;
     ap.days.forEach(d=>{AI_BASE[d.key]=d.blocks;PLANS[d.key]={name:String(d.name).slice(0,24),sub:String(d.sub||'').slice(0,80),type:d.type==='train'?'train':'rest',blocks:[]}});
     CYCLE=ap.days.map(d=>d.key);START=ap.start;
-  }else{CYCLE=BASE_CYCLE.slice();START=BASE_START}
+  }else{CYCLE=BASE_CYCLE.slice();START=DEMO&&S.profile.setup?S.profile.setup.start:BASE_START}
   // The coach's meal plan and calorie targets apply only while its program is active and the viewer chose to use them.
   const am=aiActive()&&S.profile.aiPlan.useMeals&&validMeals(S.profile.aiPlan.meals)?S.profile.aiPlan.meals:null;
   MEALS=am?am:BASE_MEALS;
@@ -2214,6 +2228,7 @@ document.addEventListener('click',ev=>{
 });
 let searchT;
 document.addEventListener('input',ev=>{
+  if(ev.target.dataset&&ev.target.dataset.c==='setupIn'&&S.setupDraft){S.setupDraft[ev.target.dataset.k]=ev.target.value;return}
   const el=ev.target,c=el.dataset.c;
   if(c==='search'){S.sheet.q=el.value;clearTimeout(searchT);searchT=setTimeout(()=>{const pos=el.selectionStart;renderSheet();const i=$('#foodSearch');if(i){i.focus();try{i.setSelectionRange(pos,pos)}catch(e){}}},120)}
   if(c==='qty'){S.sheet.qty=Number(el.value)||0}
@@ -2259,7 +2274,7 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.sheet){stopScan
 
 /* ---------- automatic backup to a private GitHub gist (home-screen app only) ---------- */
 // The token and gist id stay outside the gymbro: prefix, so they are never inside a backup.
-const GH_LS='gymbro-gh',GH_FILE='gymbro-data.json';
+const GH_LS=DEMO?'gymbrodemo-gh':'gymbro-gh',GH_FILE=DEMO?'gymbro-demo-data.json':'gymbro-data.json';
 const ghCfg=()=>{try{return JSON.parse(localStorage.getItem(GH_LS))||null}catch(e){return null}};
 const ghSet=patch=>{const c={...(ghCfg()||{}),...patch};try{localStorage.setItem(GH_LS,JSON.stringify(c))}catch(e){}return c};
 async function ghApi(path,opt={},token){
@@ -2327,6 +2342,7 @@ setInterval(()=>{if(ghCfg())renderSync()},60000);
 /* ---------- one-time fill: the days lost when the old app was deleted, marked fully done ---------- */
 const FILL_FROM='2026-11-08',FILL_TO='2026-11-12',FILL_FLAG='gymbro-filled-2026-11-08';
 async function fillPastDays(){
+  if(DEMO)return;
   try{if(localStorage.getItem(FILL_FLAG))return}catch(e){return}
   for(let d=FILL_FROM;d<=FILL_TO;d=addDays(d,1)){
     const cur=await load(dayKey(d));if(dayHas(cur))continue;
@@ -2340,6 +2356,71 @@ async function fillPastDays(){
   try{localStorage.setItem(FILL_FLAG,'1')}catch(e){}
   S.dayCache={};S.repData=null;await loadDay();
 }
+
+/* ---------- demo: first-time setup and personal targets ---------- */
+const BASE_MEALS0=JSON.parse(JSON.stringify(BASE_MEALS)),BASE_TARGET0=JSON.parse(JSON.stringify(BASE_TARGET));
+const DGOALS=[['bulk','Build muscle','Lean bulk, about +300 kcal'],['cut','Lose fat','Keep muscle, about −450 kcal'],['maintain','Recomp','Same weight, more muscle']];
+function demoCalc(u){
+  const bmr=Math.round(10*u.weight+6.25*u.height-5*u.age+(u.sex==='f'?-161:5));
+  const tee=Math.round(bmr*1.5),adj={bulk:300,cut:-450,maintain:0}[u.goal];
+  const t=(kcal,pk,fk)=>{const p=Math.round(u.weight*pk),f=Math.round(u.weight*fk);return{kcal,p,c:Math.max(60,Math.round((kcal-p*4-f*9)/4)),f}};
+  const rest=Math.round((tee+adj-100)/10)*10,train=rest+300,pk=u.goal==='cut'?2.3:2.0;
+  return{bmr,tee,train:t(train,pk,0.9),rest:t(rest,pk-0.1,1.0)};
+}
+function applyDemo(){
+  const u=S.profile.setup;if(!u)return;
+  const c=demoCalc(u),h=u.height/100;
+  Object.assign(REPORT,{date:u.start,age:u.age,height:u.height,weight:u.weight,bmr:c.bmr,tee:c.tee,bmi:r1(u.weight/(h*h)),stdWeight:r1(22*h*h)});
+  Object.assign(GOAL,{weight:u.goalWeight,stretch:u.goalWeight,dir:u.goal==='bulk'?1:u.goal==='cut'?-1:0,rateLo:u.goal==='cut'?0.4:0.25,rateHi:u.goal==='cut'?0.8:0.35});
+  BASE_TARGET.train={...c.train};BASE_TARGET.rest={...c.rest};
+  // Scale the starter meal plan to their calories (to the nearest quarter serving; salad and vegetables stay as they are).
+  const planK=ty=>BASE_MEALS0.reduce((a,m)=>a+mealItems(m,ty).reduce((x,[id,q])=>x+(foodById(id)||{k:0}).k*q,0),0);
+  const k=(c.train.kcal/planK('train')+c.rest.kcal/planK('rest'))/2;
+  const sc=([id,q])=>[id,/^(salad|veg)$/.test(id)?q:Math.max(0.25,Math.round(q*k*4)/4)];
+  BASE_MEALS.forEach((m,i)=>{const o=BASE_MEALS0[i];m.items=o.items.map(sc);if(o.restExtra)m.restExtra=o.restExtra.map(sc)});
+  const b=document.querySelector('.brand small');if(b)b.textContent=(lbl(DGOALS,u.goal)+' · '+u.height+' cm').toUpperCase();
+}
+function viewSetup(){
+  const u=S.setupDraft||(S.setupDraft={...(S.profile.setup||{name:'',sex:'m',age:'',height:'',weight:'',goal:'bulk',days:4,goalWeight:''})});
+  const opt=(k,v,n,sub)=>`<button type="button" class="${String(u[k])===String(v)?'on':''}" aria-pressed="${String(u[k])===String(v)}" data-a="setupSet" data-k="${k}" data-v="${v}">${esc(n)}${sub?`<small style="display:block;font-weight:400;opacity:.75">${esc(sub)}</small>`:''}</button>`;
+  const num=(k,label,ph,step)=>`<label class="f">${label}<input type="number" inputmode="decimal" step="${step||1}" data-c="setupIn" data-k="${k}" value="${esc(u[k]??'')}" placeholder="${ph}"></label>`;
+  return `<section class="card"><div class="row"><img src="${LOGO}" alt="" width="56" height="56" style="border-radius:14px"><div><div class="eyebrow">Welcome to GYMBRO</div><h2 style="margin:0">${S.profile.setup?'Your stats':'Set up in 1 minute'}</h2></div></div>
+    <p class="muted" style="font-size:13px">Your calories, macros, meal plan and progress tracking are built from this. Everything stays on your phone.</p></section>
+  <section class="card">
+    <label class="f">First name<input type="text" data-c="setupIn" data-k="name" value="${esc(u.name||'')}" placeholder="e.g. Ahmed" autocomplete="given-name"></label>
+    <div class="f">Sex<div class="mchips">${opt('sex','m','Male')}${opt('sex','f','Female')}</div></div>
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${num('age','Age','25')}${num('height','Height cm','178')}${num('weight','Weight kg','72',0.1)}</div>
+    <div class="f">Goal<div class="mchips">${DGOALS.map(([v,n,d])=>opt('goal',v,n,d)).join('')}</div></div>
+    <div class="f">Training days per week <span class="muted" style="font-size:12px">(the AI Coach builds around this)</span><div class="mchips">${[3,4,5,6].map(d=>opt('days',d,d+' days')).join('')}</div></div>
+    ${num('goalWeight','Goal weight kg (optional)','we suggest one',0.1)}
+    ${S.setupErr?`<p class="callout" style="color:var(--prot);font-size:13px">${esc(S.setupErr)}</p>`:''}
+    <div class="row">${S.profile.setup?'<button class="btn ghost" data-a="setupCancel">Cancel</button>':''}<button class="btn" style="flex:1" data-a="setupSave">${S.profile.setup?'Save':'Build my plan'}</button></div>
+  </section>`;
+}
+function demoScan(){
+  const u=S.profile.setup;if(!u)return '';const c=demoCalc(u);
+  return `<section class="card"><div class="eyebrow">Your starting point · ${fmtDate(u.start)}</div><h3>Where you started</h3>
+    <div class="stats"><div class="stat"><b class="num">${u.weight}</b><span>Weight kg</span></div><div class="stat"><b class="num">${REPORT.bmi}</b><span>BMI</span></div><div class="stat"><b class="num">${u.goalWeight}</b><span>Goal kg</span></div>
+    <div class="stat"><b class="num">${c.bmr}</b><span>BMR kcal (at rest)</span></div><div class="stat"><b class="num">${c.tee}</b><span>Est. burn kcal/day</span></div><div class="stat"><b class="num">${TARGET.train.p}</b><span>Protein g/day</span></div></div>
+    <p class="muted" style="font-size:13px">Estimated from your age, height and weight (Mifflin-St Jeor). Targets: ${TARGET.train.kcal} kcal on training days and ${TARGET.rest.kcal} on rest days. Watch your weekly average weight in Progress and adjust by 150 kcal if it moves too slowly or too fast.</p>
+    <button class="btn ghost sm" data-a="setupEdit">Edit my stats</button></section>`;
+}
+Object.assign(actions,{
+  setupSet(v,el){S.setupDraft[el.dataset.k]=el.dataset.k==='days'?+v:v;S.setupErr='';render()},
+  setupEdit(){S.setupDraft=null;S.editSetup=true;render();window.scrollTo(0,0)},
+  setupCancel(){S.setupDraft=null;S.editSetup=false;render()},
+  setupSave(){
+    const u=S.setupDraft,n=k=>parseFloat(u[k]);
+    const age=n('age'),height=n('height'),weight=n('weight');
+    if(!(age>=13&&age<=90)||!(height>=120&&height<=230)||!(weight>=35&&weight<=250)){S.setupErr='Fill in your age, height (cm) and weight (kg).';render();return}
+    let gw=n('goalWeight');if(!(gw>=35&&gw<=250))gw=r1(u.goal==='bulk'?weight+5:u.goal==='cut'?weight-5:weight);
+    const first=!S.profile.setup;
+    S.profile.setup={name:String(u.name||'').trim().slice(0,30),sex:u.sex,age,height,weight,goal:u.goal,days:u.days,goalWeight:gw,start:first?TODAY:S.profile.setup.start};
+    if(S.profile.setup.name)S.profile.name=S.profile.setup.name;
+    if(first){S.profile.weights={[TODAY]:weight}}
+    S.setupDraft=null;S.editSetup=false;S.setupErr='';rebuildPlans();saveProfile();S.tab='today';render();window.scrollTo(0,0);
+  },
+});
 
 /* ---------- move data between devices ---------- */
 function backupObj(){const out={app:'gymbro',version:1,exported:new Date().toISOString(),data:{}};localKeys().forEach(k=>{const v=lsGet(k);if(v!=null)out.data[k]=v});return out}
@@ -2377,8 +2458,8 @@ document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='a5a625e2fb'
-const BUILD_ID='a5a625e2fb';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='f68835d02c'
+const BUILD_ID='f68835d02c';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{

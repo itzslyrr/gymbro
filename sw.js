@@ -1,5 +1,5 @@
 // Offline cache for GYMBRO. The version changes on every build, so phones pick up updates.
-const CACHE = 'gymbro-a5a625e2fb';
+const CACHE = 'gymbro-f68835d02c';
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "mus/abduct.jpg", "mus/abs.jpg", "mus/biceps.jpg", "mus/calves.jpg", "mus/cardio.jpg", "mus/chest.jpg", "mus/fdelt.jpg", "mus/forearms.jpg", "mus/glutes.jpg", "mus/hams.jpg", "mus/lats.jpg", "mus/lowback.jpg", "mus/neck.jpg", "mus/obliques.jpg", "mus/quads.jpg", "mus/rdelt.jpg", "mus/sdelt.jpg", "mus/triceps.jpg", "mus/upback.jpg"];
 
 self.addEventListener('install', e => {
@@ -16,6 +16,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.pathname.includes('/demo/')) return; // the demo has its own worker
   // App page: network first so updates arrive when online, cache when offline.
   if (url.searchParams.has('check')) return; // update checks always go to the network
   if (req.mode === 'navigate') {
