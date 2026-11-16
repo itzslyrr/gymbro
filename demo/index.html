@@ -301,6 +301,17 @@ nav.tabbar button.on{color:var(--brand)}
 nav.tabbar button.on svg{stroke-width:2.2}
 img.broken{visibility:hidden;background:var(--surface-2)}
 #ghCard{scroll-margin-top:90px}
+.fab{position:fixed;z-index:30;right:max(16px,calc(50% - 304px));bottom:calc(78px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:11px 16px;background:var(--brand);color:var(--on-brand);font:600 14px/1 inherit;box-shadow:0 6px 18px rgb(0 0 0 / .25)}
+.chat .sb{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+.msg{max-width:86%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.msg.u{align-self:flex-end;background:var(--brand);color:var(--on-brand);border-bottom-right-radius:4px}
+.msg.a{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.acts{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:12.5px}
+.acts span{background:var(--surface-2);border-radius:8px;padding:4px 8px}
+.chatin{display:flex;gap:8px;padding:10px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line)}
+.chatin textarea{flex:1;min-height:42px;max-height:120px;resize:none;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px;font:inherit}
+.chat{grid-template-rows:auto 1fr auto!important;height:88%}
+.sugg{display:flex;flex-wrap:wrap;gap:6px}.sugg button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 11px;font:inherit;font-size:12.5px}
 .sync{font-size:11px;color:var(--muted);text-align:center;padding-top:4px}
 @media (max-width:380px){.hero{grid-template-columns:1fr;justify-items:center}.macros{width:100%}.stats{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.demo img+img{animation:none;opacity:0}}
@@ -316,7 +327,7 @@ img.broken{visibility:hidden;background:var(--surface-2)}
   </div>
 </header>
 <div class="wrap"><main id="view"></main><div class="sync" id="sync"></div></div>
-<div id="sheet"></div>
+<div id="sheet"></div><div id="chat"></div><button id="fab" class="fab" data-a="chatOpen" hidden><span aria-hidden="true">✦</span> Ask AI</button>
 
 <div id="timer"></div>
 <nav class="tabbar"><div class="in" id="tabbar"></div></nav>
@@ -1679,14 +1690,21 @@ function viewBody(){
   </section>`;
 }
 
+// The built-in list plus anything the AI chat added, renamed or removed.
+function groceryList(){
+  const hid=S.profile.groceryHidden||{},ed=S.profile.groceryEdits||{},ex=S.profile.groceryExtra||[];
+  const secs=GROCERY.map(s=>({t:s.t,items:s.items.filter(([k])=>!hid[k]).map(([k,n,q])=>[k,(ed[k]||{}).n||n,(ed[k]||{}).q??q])}));
+  ex.forEach(([k,n,q,t])=>{if(hid[k])return;let sec=secs.find(x=>x.t===t);if(!sec){sec={t:t||'Other',items:[]};secs.push(sec)}sec.items.push([k,(ed[k]||{}).n||n,(ed[k]||{}).q??q])});
+  return secs.filter(x=>x.items.length);
+}
 function viewShop(){
-  const g=S.profile.grocery,all=GROCERY.flatMap(s=>s.items),done=all.filter(([k])=>g[k]).length;
+  const g=S.profile.grocery,GL=groceryList(),all=GL.flatMap(s=>s.items),done=all.filter(([k])=>g[k]).length;
   return `
   <section class="card">
     <div class="row between"><div><div class="eyebrow">One week at plan</div><h2>Grocery list</h2></div><span class="chip num">${done}/${all.length}</span></div>
     ${S.confirm==='grocery'?`<div class="row"><span style="flex:1;font-size:13px">Untick everything for a new week?</span><button class="btn sm" data-a="resetGrocery">Untick all</button><button class="btn ghost sm" data-a="cancelConfirm">Cancel</button></div>`:`<button class="btn ghost sm" style="justify-self:start" data-a="askReset">New week: untick all</button>`}
   </section>
-  ${GROCERY.map(s=>`<section class="card"><h3>${esc(s.t)}</h3><div class="list">${s.items.map(([k,n,q])=>`<div class="li"><button class="check ${g[k]?'on':''}" data-a="grocery" data-v="${k}" aria-label="${esc(n)}"></button><div class="t" style="${g[k]?'opacity:.5;text-decoration:line-through':''}"><b>${esc(n)}</b><small>${esc(q)}</small></div></div>`).join('')}</div></section>`).join('')}`;
+  ${GL.map(s=>`<section class="card"><h3>${esc(s.t)}</h3><div class="list">${s.items.map(([k,n,q])=>`<div class="li"><button class="check ${g[k]?'on':''}" data-a="grocery" data-v="${k}" aria-label="${esc(n)}"></button><div class="t" style="${g[k]?'opacity:.5;text-decoration:line-through':''}"><b>${esc(n)}</b><small>${esc(q)}</small></div></div>`).join('')}</div></section>`).join('')}`;
 }
 
 /* ---------- add-food sheet ---------- */
@@ -1927,7 +1945,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v21 · 13 Nov 2026';
+const APP_VERSION='v22 · 16 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -1956,7 +1974,7 @@ function viewMore(){
 
 /* ---------- render ---------- */
 function render(){
-  renderHeader();renderTabs();renderSync();
+  renderHeader();renderTabs();renderSync();renderFab();
   if(DEMO&&(!S.profile.setup||S.editSetup)){$('#tabbar').hidden=!S.profile.setup;$('#view').innerHTML=viewSetup();renderSheet();return}
   $('#tabbar').hidden=false;
   const v={today:viewToday,food:viewFood,train:viewTrain,progress:viewProgress,more:viewMore}[S.tab]||viewToday;
@@ -1987,7 +2005,9 @@ function rebuildPlans(){
   // The coach's meal plan and calorie targets apply only while its program is active and the viewer chose to use them.
   const am=aiActive()&&S.profile.aiPlan.useMeals&&validMeals(S.profile.aiPlan.meals)?S.profile.aiPlan.meals:null;
   MEALS=am?am:BASE_MEALS;
-  ['train','rest'].forEach(t=>Object.assign(TARGET[t],am&&S.profile.aiPlan.targets&&S.profile.aiPlan.targets[t]?S.profile.aiPlan.targets[t]:BASE_TARGET[t]));
+  // Meal plan and target changes made through the AI chat sit on top of whichever plan is active.
+  if(validMeals(S.profile.mealPlan))MEALS=S.profile.mealPlan;
+  ['train','rest'].forEach(t=>Object.assign(TARGET[t],am&&S.profile.aiPlan.targets&&S.profile.aiPlan.targets[t]?S.profile.aiPlan.targets[t]:BASE_TARGET[t],(S.profile.targetEdits||{})[t]||{}));
   Object.keys(PLANS).forEach(k=>{const base=AI_BASE[k]||BASE_BLOCKS[k];if(!base)return;PLANS[k]={...PLANS[k],blocks:JSON.parse(JSON.stringify(validBlocks(pe[k])?pe[k]:base))}});
   Object.keys(EXBYID).forEach(k=>delete EXBYID[k]);
   Object.values(PLANS).forEach(p=>p.blocks.forEach(b=>b.items.forEach(e=>{if(!EXBYID[e.id])EXBYID[e.id]=e})));
@@ -2441,6 +2461,159 @@ async function importRecords(data){
 // A picture that cannot load shows a quiet placeholder instead of a broken-image icon.
 document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'&&!t.classList.contains('broken'))t.classList.add('broken')},true);
 
+/* ---------- AI chat: edits food, training and groceries on request ---------- */
+// Runs on the viewer's Anthropic API key when one is saved, otherwise on Claude inside the Claude app.
+const chatCtx=()=>S.tab==='food'?'food':S.tab==='train'?'train':S.tab==='more'&&S.moreSub==='shop'?'grocery':null;
+const CHAT_NAMES={food:'Food',train:'Training',grocery:'Grocery'};
+const CHAT_SUGG={food:['Swap the salmon at dinner for chicken','Add 2 boiled eggs to my snack today','Raise rest-day calories by 150','What should I eat to hit protein today?'],
+  train:['Add shrugs for my traps','Replace dips with a chest press machine','Make leg day shorter, 45 min max','Which muscles am I not training enough?'],
+  grocery:['Add Greek yogurt 2 kg','Remove avocados','I already have rice, take it off','Make the list for 2 weeks']};
+function renderFab(){const f=$('#fab');if(!f)return;const c=chatCtx();f.hidden=!c||!!S.chat||!!S.sheet||(DEMO&&!S.profile.setup)}
+function renderChat(){
+  const el=$('#chat');if(!el)return;const c=S.chat;
+  if(!c){el.innerHTML='';renderFab();return}
+  const msgs=c.msgs.map((m,i)=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.text)}${m.acts&&m.acts.length?`<div class="acts">${m.acts.map(a=>`<span>✓ ${esc(a)}</span>`).join('')}${m.undo?`<button class="btn ghost sm" style="align-self:flex-start;margin-top:4px" data-a="chatUndo" data-v="${i}">Undo these changes</button>`:m.undone?'<span>Undone</span>':''}</div>`:''}</div>`).join('');
+  el.innerHTML=`<div class="sheet-bg" data-a="chatClose"><div class="sheet chat" role="dialog" aria-label="AI chat">
+    <div class="sh"><div class="row between"><div><div class="eyebrow">AI · ${esc(CHAT_NAMES[c.ctx])}</div><h3>Ask GYMBRO</h3></div><div class="row" style="gap:6px">${c.msgs.length?'<button class="btn ghost sm" data-a="chatClear">Clear</button>':''}<button class="x" data-a="chatClose" data-v="x" aria-label="Close">×</button></div></div></div>
+    <div class="sb" id="chatLog">${c.msgs.length?'':`<p class="muted" style="font-size:13px">Tell me what to change and I'll do it for you, or ask anything. For example:</p><div class="sugg">${CHAT_SUGG[c.ctx].map(t=>`<button data-a="chatSugg">${esc(t)}</button>`).join('')}</div>`}${msgs}${c.busy?`<div class="msg a muted" id="chatBusy">${esc(c.status||'Thinking…')}</div>`:''}${c.err?`<p class="callout" style="color:var(--prot);font-size:13px">${esc(c.err)}</p>`:''}</div>
+    <div class="chatin"><textarea id="chatIn" rows="1" placeholder="Ask or tell me what to change" enterkeyhint="send">${esc(c.draft||'')}</textarea><button class="btn" data-a="chatSend" ${c.busy?'disabled':''}>Send</button></div>
+  </div></div>`;
+  const log=$('#chatLog');if(log)log.scrollTop=log.scrollHeight;renderFab();
+}
+// Snapshot what a turn may change, so one tap undoes the whole turn.
+function chatTx(){
+  const tx={profile:JSON.parse(JSON.stringify(S.profile)),days:{},touched:new Set(),acts:[]};
+  tx.day=async d=>{d=d||S.date;if(!/^\d{4}-\d{2}-\d{2}$/.test(d))throw new Error('date must be YYYY-MM-DD');
+    const day=d===S.date?S.day:(S.dayCache[d]||Object.assign(blankDay(),await load(dayKey(d))||{}));
+    if(!(d in tx.days))tx.days[d]=JSON.parse(JSON.stringify(day));S.dayCache[d]=day;tx.touched.add(d);return day};
+  tx.peek=async d=>d===S.date?S.day:(S.dayCache[d]||Object.assign(blankDay(),await load(dayKey(d))||{}));
+  return tx;
+}
+const entryView=e=>({entry_id:e.id,meal:e.meal,food:e.name,qty:e.qty,unit:e.unit,kcal:e.kcal,protein:e.p});
+const mealView=m=>({meal_id:m.id,name:m.n,time:m.time||'',only:m.train?'training days':m.rest?'rest days':'every day',foods:m.items.map(([id,q])=>{const f=foodById(id);return{food_id:id,name:f?f.n:id,qty:q,unit:f?f.u:''}})});
+const editMeals=()=>{if(!validMeals(S.profile.mealPlan))S.profile.mealPlan=JSON.parse(JSON.stringify(MEALS));return S.profile.mealPlan};
+const groceryRow=k=>groceryList().flatMap(s=>s.items.map(it=>[...it,s.t])).find(it=>it[0]===k);
+const dayView=k=>{const p=PLANS[k];return p?{day_key:k,name:p.name,type:p.type,blocks:p.blocks.map((b,bi)=>({block:bi,title:b.t,exercises:b.items.map(e=>({exercise_id:e.id,name:e.n,sets:e.s,reps:e.r,rest:e.rest,muscles:musOf(e)}))}))}:null};
+function chatTools(ctx,tx){
+  const T=[];const add=(name,description,props,req,run)=>T.push({name,description,input_schema:{type:'object',properties:props,required:req||[]},run});
+  const str={type:'string'},num={type:'number'};
+  if(ctx==='food'||ctx==='grocery'){
+    add('search_foods','Find foods in the food database by name. Returns ids to use with other tools.',{query:str},['query'],({query})=>{const q=String(query||'').toLowerCase();return FOODS.concat(S.profile.customFoods||[]).filter(f=>f.n.toLowerCase().includes(q)||f.id.includes(q)).slice(0,15).map(f=>({food_id:f.id,name:f.n,serving:f.u,kcal:f.k,protein:f.p,carbs:f.c,fat:f.f}))});
+  }
+  if(ctx==='food'){
+    add('get_day_log','Foods logged on a day, with totals and targets.',{date:str},[],async({date})=>{const d=date||S.date,day=await tx.peek(d),t=targets(d),tot=totals(day.foods);return{date:d,day_type:dayType(d),entries:day.foods.map(entryView),totals:{kcal:r0(tot.k),protein:r0(tot.p),carbs:r0(tot.c),fat:r0(tot.f)},targets:t}});
+    add('add_food','Log a food on a day. Use food_id from the database, or give custom nutrition per serving to create a new food.',{meal_id:str,food_id:str,qty:{type:'number',description:'number of servings of the food\'s serving size'},date:str,custom:{type:'object',properties:{name:str,serving:str,kcal:num,protein:num,carbs:num,fat:num}}},['meal_id','qty'],async({meal_id,food_id,qty,date,custom})=>{
+      let f=food_id?foodById(food_id):null;
+      if(!f&&custom&&custom.name){f={id:'cf-'+uid(),n:String(custom.name).slice(0,60),u:String(custom.serving||'1 serving').slice(0,30),k:+custom.kcal||0,p:+custom.protein||0,c:+custom.carbs||0,f:+custom.fat||0};S.profile.customFoods=[...(S.profile.customFoods||[]),f]}
+      if(!f)throw new Error('unknown food_id; search_foods first or give custom');
+      const d=date||S.date,day=await tx.day(d),ms=mealsFor(d);if(!ms.some(m=>m.id===meal_id))throw new Error('meal_id must be one of '+ms.map(m=>m.id).join(', '));
+      const e=entryFrom(f,+qty||1,meal_id);day.foods.push(e);tx.acts.push(`Added ${qtyLabel(e.qty)} × ${f.n} (${f.u}) to ${(ms.find(m=>m.id===meal_id)||{}).n}${d!==S.date?' on '+fmtDate(d):''}`);return{ok:true,entry:entryView(e)}});
+    add('update_food_entry','Change the amount or meal of a logged entry.',{entry_id:str,qty:num,meal_id:str,date:str},['entry_id'],async({entry_id,qty,meal_id,date})=>{const day=await tx.day(date),e=day.foods.find(x=>x.id===entry_id);if(!e)throw new Error('no such entry');const f=foodById(e.fid);
+      if(qty>0){const k=qty/e.qty;e.qty=qty;e.kcal=r0(e.kcal*k);e.p=r1(e.p*k);e.c=r1(e.c*k);e.f=r1(e.f*k)}if(meal_id)e.meal=meal_id;delete e.plan;tx.acts.push(`Changed ${e.name} to ${qtyLabel(e.qty)} × ${e.unit}`);return{ok:true,entry:entryView(e)}});
+    add('remove_food_entry','Remove a logged entry.',{entry_id:str,date:str},['entry_id'],async({entry_id,date})=>{const day=await tx.day(date),e=day.foods.find(x=>x.id===entry_id);if(!e)throw new Error('no such entry');day.foods=day.foods.filter(x=>x!==e);tx.acts.push(`Removed ${e.name}`);return{ok:true}});
+    add('get_meal_plan','The daily meal plan (what "Log plan" logs) and calorie targets.',{},[],()=>({meals:MEALS.filter(m=>m.id!=='extra').map(mealView),targets:TARGET}));
+    add('edit_meal_plan','Change the meal plan: add a food to a meal, remove one, or set its servings. Also add a new meal, remove a meal, or rename/retime one.',{action:{type:'string',enum:['add_food','remove_food','set_qty','add_meal','remove_meal','rename_meal']},meal_id:str,food_id:str,qty:num,name:str,time:{type:'string',description:'HH:MM'},only:{type:'string',enum:['every day','training days','rest days']}},['action'],({action,meal_id,food_id,qty,name,time,only})=>{
+      const ms=editMeals(),m=ms.find(x=>x.id===meal_id);
+      if(action==='add_meal'){const nm={id:'m-'+uid().slice(0,5),n:String(name||'Meal').slice(0,24),time:time||'',items:[]};if(only==='training days')nm.train=true;if(only==='rest days')nm.rest=true;ms.splice(Math.max(0,ms.findIndex(x=>x.id==='extra')),0,nm);tx.acts.push('New meal in plan: '+nm.n);return{ok:true,meal_id:nm.id}}
+      if(!m||m.id==='extra')throw new Error('meal_id must be one of '+ms.filter(x=>x.id!=='extra').map(x=>x.id).join(', '));
+      if(action==='remove_meal'){if(ms.length<=3)throw new Error('keep at least two meals');S.profile.mealPlan=ms.filter(x=>x!==m);tx.acts.push('Removed '+m.n+' from the plan');return{ok:true}}
+      if(action==='rename_meal'){if(name)m.n=String(name).slice(0,24);if(time)m.time=time;tx.acts.push('Updated '+m.n);return{ok:true}}
+      const f=foodById(food_id);if(!f)throw new Error('unknown food_id');const it=m.items.find(x=>x[0]===food_id);
+      if(action==='remove_food'){if(!it)throw new Error('that food is not in this meal');m.items=m.items.filter(x=>x!==it);tx.acts.push(`Plan: removed ${f.n} from ${m.n}`);return{ok:true}}
+      if(!(qty>0))throw new Error('qty must be above 0');
+      if(it)it[1]=qty;else m.items.push([food_id,qty]);tx.acts.push(`Plan: ${m.n} now has ${qtyLabel(qty)} × ${f.n}`);return{ok:true}});
+    add('set_targets','Change daily calorie and macro targets for training days, rest days or both.',{days:{type:'string',enum:['train','rest','both']},kcal:num,protein:num,carbs:num,fat:num},['days'],({days,kcal,protein,carbs,fat})=>{const te=S.profile.targetEdits||(S.profile.targetEdits={});
+      (days==='both'?['train','rest']:[days]).forEach(t=>{const o=te[t]||(te[t]={});if(kcal>0)o.kcal=r0(kcal);if(protein>0)o.p=r0(protein);if(carbs>0)o.c=r0(carbs);if(fat>0)o.f=r0(fat)});
+      tx.acts.push(`Targets (${days==='both'?'all days':days==='train'?'training days':'rest days'}): ${[kcal&&r0(kcal)+' kcal',protein&&r0(protein)+' g protein',carbs&&r0(carbs)+' g carbs',fat&&r0(fat)+' g fat'].filter(Boolean).join(', ')}`);return{ok:true}});
+    add('reset_meal_plan','Undo all chat changes to the meal plan and targets.',{},[],()=>{delete S.profile.mealPlan;delete S.profile.targetEdits;tx.acts.push('Meal plan and targets back to the original');return{ok:true}});
+  }
+  if(ctx==='train'){
+    add('get_program','The full training cycle: every day with its exercises.',{},[],()=>({today_key:planKey(S.date),cycle:CYCLE.map(dayView)}));
+    add('search_library','Search the ranked exercise library by name or muscle. Lower rank = better. back_load true means it loads the lower back.',{query:str,muscle:{type:'string',enum:Object.keys(MUSCLES)}},[],({query,muscle})=>{const q=String(query||'').toLowerCase();return LIB.filter(x=>(!q||x.n.toLowerCase().includes(q))&&(!muscle||x.m.includes(muscle))).slice(0,15).map(x=>({library_key:x.key,name:x.n,muscles:x.m,back_load:!!x.back,rank:x.rank}))});
+    add('add_exercise','Add an exercise to a day. Prefer library_key (has demo pictures). Otherwise give a name and muscles.',{day_key:str,library_key:str,name:str,sets:num,reps:str,rest:str,muscles:{type:'array',items:{type:'string',enum:Object.keys(MUSCLES)}},tip:str,position:{type:'number',description:'index within its block; omit to add at the end'}},['day_key'],({day_key,library_key,name,sets,reps,rest,muscles,tip,position})=>{
+      if(!PLANS[day_key])throw new Error('day_key must be one of '+CYCLE.join(', '));const bl=editBlocks(day_key);if(!bl.length)bl.push({t:'Lifts',items:[]});
+      const b=bl.find(b=>!/abs|neck|stamina|finisher|recovery|get ready|conditioning/i.test(b.t))||bl[0];
+      let e;const x=library_key&&LIBBYKEY[library_key];
+      if(x){e=libExercise(x,'lib-'+x.key+'-'+uid().slice(0,4))}else{if(!name)throw new Error('give library_key or name');e={id:'c-'+uid(),n:String(name).slice(0,60),s:3,r:'8–12',rest:'90 s',w:!NO_KG.test(name),tip:'',m:(muscles||[]).filter(k=>MUSCLES[k])}}
+      if(sets>0)e.s=Math.min(10,r0(sets));if(reps)e.r=String(reps).slice(0,20);if(rest)e.rest=String(rest).slice(0,12);if(tip)e.tip=String(tip).slice(0,200);if(name&&x)e.n=String(name).slice(0,60);
+      if(position>=0&&position<b.items.length)b.items.splice(position,0,e);else b.items.push(e);
+      tx.acts.push(`Added ${e.n} (${e.s} × ${e.r}) to ${PLANS[day_key].name}`);return{ok:true,exercise_id:e.id}});
+    add('update_exercise','Change sets, reps, rest, name or coaching tip of an exercise.',{day_key:str,exercise_id:str,sets:num,reps:str,rest:str,name:str,tip:str},['day_key','exercise_id'],({day_key,exercise_id,sets,reps,rest,name,tip})=>{
+      if(!PLANS[day_key])throw new Error('unknown day_key');const f=findItem(editBlocks(day_key),exercise_id);if(!f)throw new Error('no such exercise on that day');const e=f.e;
+      if(sets>0)e.s=Math.min(10,r0(sets));if(reps)e.r=String(reps).slice(0,20);if(rest)e.rest=String(rest).slice(0,12);if(tip)e.tip=String(tip).slice(0,200);if(name&&name!==e.n){e.n=String(name).slice(0,60);e.renamed=true}
+      tx.acts.push(`${e.n}: ${e.s} × ${e.r}, rest ${e.rest} (${PLANS[day_key].name})`);return{ok:true}});
+    add('remove_exercise','Remove an exercise from a day.',{day_key:str,exercise_id:str},['day_key','exercise_id'],({day_key,exercise_id})=>{if(!PLANS[day_key])throw new Error('unknown day_key');const bl=editBlocks(day_key),f=findItem(bl,exercise_id);if(!f)throw new Error('no such exercise on that day');bl[f.bi].items.splice(f.i,1);tx.acts.push(`Removed ${f.e.n} from ${PLANS[day_key].name}`);return{ok:true}});
+    add('reset_day','Put a day back to its original exercises.',{day_key:str},['day_key'],({day_key})=>{const pe={...(S.profile.planEdits||{})};delete pe[day_key];S.profile.planEdits=pe;tx.acts.push(`${(PLANS[day_key]||{}).name||day_key} back to original`);return{ok:true}});
+  }
+  if(ctx==='grocery'){
+    add('get_grocery_list','The current weekly grocery list with item ids and whether each is ticked (already bought).',{},[],()=>groceryList().map(s=>({section:s.t,items:s.items.map(([k,n,q])=>({item_id:k,name:n,amount:q,bought:!!S.profile.grocery[k]}))})));
+    add('add_grocery_item','Add an item to the list.',{name:str,amount:str,section:{type:'string',description:'e.g. Protein, Carbs, Fats, Fruit & veg, Supplements & extras'}},['name'],({name,amount,section})=>{const k='gx-'+uid().slice(0,6);S.profile.groceryExtra=[...(S.profile.groceryExtra||[]),[k,String(name).slice(0,50),String(amount||'').slice(0,40),String(section||'Other').slice(0,30)]];tx.acts.push(`Added ${name}${amount?' ('+amount+')':''}`);return{ok:true,item_id:k}});
+    add('update_grocery_item','Rename an item or change its amount.',{item_id:str,name:str,amount:str},['item_id'],({item_id,name,amount})=>{const it=groceryRow(item_id);if(!it)throw new Error('no such item');const ed=S.profile.groceryEdits||(S.profile.groceryEdits={});ed[item_id]={...(ed[item_id]||{}),...(name?{n:String(name).slice(0,50)}:{}),...(amount!=null?{q:String(amount).slice(0,40)}:{})};tx.acts.push(`${name||it[1]}: ${amount??it[2]}`);return{ok:true}});
+    add('remove_grocery_item','Take an item off the list.',{item_id:str},['item_id'],({item_id})=>{const it=groceryRow(item_id);if(!it)throw new Error('no such item');S.profile.groceryHidden={...(S.profile.groceryHidden||{}),[item_id]:true};tx.acts.push(`Removed ${it[1]}`);return{ok:true}});
+    add('set_bought','Tick or untick items as bought.',{item_ids:{type:'array',items:str},bought:{type:'boolean'}},['item_ids','bought'],({item_ids,bought})=>{const g={...S.profile.grocery};(item_ids||[]).forEach(k=>{if(bought)g[k]=true;else delete g[k]});S.profile.grocery=g;tx.acts.push(`${bought?'Ticked':'Unticked'} ${(item_ids||[]).length} item(s)`);return{ok:true}});
+    add('reset_grocery_list','Put the list back to the original items.',{},[],()=>{delete S.profile.groceryExtra;delete S.profile.groceryHidden;delete S.profile.groceryEdits;tx.acts.push('Grocery list back to the original');return{ok:true}});
+  }
+  return T;
+}
+function chatSystem(ctx){
+  const d=S.date,t=targets(d);
+  const base=`You are the coach inside GYMBRO, ${S.profile.name||'the user'}'s training and nutrition app. Today is ${fmtDate(TODAY)} (${TODAY}); the app is showing ${d} (${dayType(d)==='train'?'training':'rest'} day, ${dayPlan(d).name}).
+${DEMO?'':'Background: lean bulk, 181 cm, about '+latestWeight()+' kg, protects his lower back (no spinal loading: no squats, deadlifts, bent-over rows, standing overhead presses, twists). Lives in the UAE.\n'}When the user asks for a change, make it with the tools straight away (look things up first with the get/search tools when you need ids), then confirm in one or two short sentences what you changed. Only ask a question when the request is truly unclear. For questions, answer briefly and practically. Never invent ids. Plain text only, no markdown headings or tables.`;
+  if(ctx==='food')return base+`\nTargets on ${d}: ${t.kcal} kcal, ${t.p} g protein, ${t.c} g carbs, ${t.f} g fat. Meals today: ${mealsFor(d).map(m=>m.id+'='+m.n).join(', ')}. Changes to "the plan" mean the meal plan (edit_meal_plan); changes to "today" or a date mean the log (add/update/remove entries).`;
+  if(ctx==='train')return base+`\nThe cycle repeats every ${CYCLE.length} days; today is ${planKey(S.date)}. Keep weekly sets per muscle sensible (10–20 hard sets) and keep the lower-back rule${DEMO?' if the user mentions back problems':''}.`;
+  return base+`\nThe grocery list covers one week of the meal plan.`;
+}
+async function chatRun(text){
+  const c=S.chat;if(!c||c.busy)return;
+  const key=getKey(),sample=key?null:(window.claude&&window.claude.use?await window.claude.use('sample'):null);
+  if(!key&&!sample){c.err='Add your Anthropic API key first: Food › + › Scan with AI › key settings.';renderChat();return}
+  c.msgs.push({role:'user',text});c.draft='';c.busy=true;c.err='';c.status='Thinking…';renderChat();
+  const tx=chatTx(),tools=chatTools(c.ctx,tx),hist=c.msgs.slice(-16).map(m=>({role:m.role,content:m.text+(m.acts&&m.acts.length?'\n[Changes made: '+m.acts.join('; ')+']':'')}));
+  const run=async(name,input)=>{const tl=tools.find(x=>x.name===name);c.status=name.startsWith('get_')||name.startsWith('search_')?'Looking…':'Making changes…';const b=$('#chatBusy');if(b)b.textContent=c.status;
+    try{return JSON.stringify(await tl.run(input||{}))}catch(e){return JSON.stringify({error:e.message||String(e)})}};
+  let reply='';
+  try{
+    if(key){
+      const {default:Anthropic}=await import(SDK_URL);
+      const client=new Anthropic({apiKey:key,dangerouslyAllowBrowser:true});
+      const msgs=hist.slice();
+      for(let i=0;i<10;i++){
+        const res=await client.messages.create({model:'claude-opus-5-5',max_tokens:4000,system:chatSystem(c.ctx),tools:tools.map(({name,description,input_schema})=>({name,description,input_schema})),messages:msgs});
+        msgs.push({role:'assistant',content:res.content});
+        const uses=res.content.filter(b=>b.type==='tool_use');
+        reply=res.content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||reply;
+        if(res.stop_reason!=='tool_use'||!uses.length)break;
+        const results=[];for(const u of uses)results.push({type:'tool_result',tool_use_id:u.id,content:await run(u.name,u.input)});
+        msgs.push({role:'user',content:results});
+      }
+    }else{
+      const conv=hist.slice();conv[0]={role:'user',content:chatSystem(c.ctx)+'\n\n'+conv[0].content};
+      const out=await sample(conv,{modelTier:'default',cache:false,tools:tools.map(({name,description,input_schema,run:r})=>({name,description,inputSchema:input_schema,execute:async inp=>JSON.parse(await run(name,inp))}))});
+      reply=(out&&out.text||'').trim();
+    }
+  }catch(e){
+    const m=String(e&&e.message||'');c.err=/401|authentication|invalid x-api-key/i.test(m)?'Your API key was rejected. Check it in Food › + › Scan with AI.':/credit|billing/i.test(m)?'Your Anthropic account is out of credit. Add credit at console.anthropic.com › Billing.':/429|rate/i.test(m)?'Too many requests right now. Wait a minute and try again.':e&&e.code==='not_granted'?'Allow GYMBRO to use Claude, then try again.':'Could not reach the AI. Check your internet and try again.';
+  }
+  // Save whatever changed, even if the reply failed part-way.
+  for(const d of tx.touched){const day=d===S.date?S.day:S.dayCache[d];if(day)save(dayKey(d),day)}
+  if(tx.acts.length){saveProfile();rebuildPlans();S.repData=null;scheduleStreaks()}
+  if(reply||tx.acts.length){const m={role:'assistant',text:reply||'Done.',acts:tx.acts};if(tx.acts.length){m.undo=true;c.undo=c.undo||{};c.undo[c.msgs.length]={profile:tx.profile,days:tx.days}}c.msgs.push(m)}
+  c.busy=false;lsSet('chat-'+c.ctx,c.msgs.slice(-30).map(({role,text,acts})=>({role,text,acts})));
+  render();renderChat();
+}
+Object.assign(actions,{
+  chatOpen(){const ctx=chatCtx();if(!ctx)return;S.chat={ctx,msgs:lsGet('chat-'+ctx)||[],busy:false,draft:'',undo:{}};renderChat();setTimeout(()=>{const i=$('#chatIn');i&&i.focus()},50)},
+  chatClose(v,el,ev){if(v!=='x'&&ev.target!==el)return;if(S.chat&&S.chat.busy)return;S.chat=null;renderChat()},
+  chatSend(){const i=$('#chatIn'),t=(i&&i.value||'').trim();if(t)chatRun(t)},
+  chatSugg(v,el){chatRun(el.textContent)},
+  chatClear(){if(!S.chat||S.chat.busy)return;S.chat.msgs=[];S.chat.undo={};lsSet('chat-'+S.chat.ctx,[]);renderChat()},
+  async chatUndo(v){const c=S.chat,i=+v,u=c&&c.undo&&c.undo[i];if(!u)return;
+    S.profile=u.profile;saveProfile();for(const[d,day]of Object.entries(u.days)){save(dayKey(d),day);S.dayCache[d]=day;if(d===S.date)S.day=day}
+    rebuildPlans();S.repData=null;delete c.undo[i];c.msgs[i].undo=false;c.msgs[i].undone=true;lsSet('chat-'+c.ctx,c.msgs.slice(-30).map(({role,text,acts})=>({role,text,acts})));render();renderChat()},
+});
+document.addEventListener('keydown',ev=>{if(ev.target.id==='chatIn'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();actions.chatSend()}});
+document.addEventListener('input',ev=>{if(ev.target.id==='chatIn'&&S.chat)S.chat.draft=ev.target.value});
+
 /* ---------- boot ---------- */
 (async()=>{
   S.profile=Object.assign(blankProfile(),lsGet('profile')||{});rebuildPlans();
@@ -2458,8 +2631,8 @@ document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='f68835d02c'
-const BUILD_ID='f68835d02c';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='ac262f6ae9'
+const BUILD_ID='ac262f6ae9';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{
