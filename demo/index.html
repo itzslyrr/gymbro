@@ -13,7 +13,8 @@
 <link rel="apple-touch-icon" href="../icon-180.png?v=2">
 <link rel="icon" href="../icon-192.png?v=2">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px;font-family:system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-</head><body><script>window.GYMBRO_DEMO=true</script>
+</head><body>
+<script>window.GYMBRO_DEMO=true</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
@@ -301,6 +302,7 @@ nav.tabbar button.on{color:var(--brand)}
 nav.tabbar button.on svg{stroke-width:2.2}
 img.broken{visibility:hidden;background:var(--surface-2)}
 #ghCard{scroll-margin-top:90px}
+body.hasfab main{padding-bottom:64px}
 .fab{position:fixed;z-index:30;right:max(16px,calc(50% - 304px));bottom:calc(78px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:11px 16px;background:var(--brand);color:var(--on-brand);font:600 14px/1 inherit;box-shadow:0 6px 18px rgb(0 0 0 / .25)}
 .chat .sb{display:flex;flex-direction:column;gap:8px;padding-top:6px}
 .msg{max-width:86%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
@@ -489,8 +491,12 @@ const WEEK={
 };
 
 /* ---------- training cycle: the built-in 8-day plan (3 on, 1 off), or an AI Coach program of 3–10 days ---------- */
-const BASE_START='2026-11-09';
-const BASE_CYCLE=['push','pull','legs','rest','upper','lower','stamina','rest2'];
+// The old 8-day cycle stays for the demo and for dates logged before the switch to PPL ×2.
+const OLD_START='2026-11-09',OLD_CYCLE=['push','pull','legs','rest','upper','lower','stamina','rest2'];
+// From 23 Nov 2026: Push/Pull/Legs twice a week, Friday off. Sat 21 Nov = Push A, so Mon 23 = Legs A and Fri = rest.
+const PPL_FROM='2026-11-23';
+const BASE_START=DEMO?OLD_START:'2026-11-21';
+const BASE_CYCLE=DEMO?OLD_CYCLE:['pushA','pullA','legsA','pushB','pullB','legsB','rest'];
 let START=BASE_START;
 let CYCLE=BASE_CYCLE.slice();
 const REST_ITEMS=[E('walk','Easy walk',1,'30–45 min','—',false),E('mob','Mobility: cat-cow, hip flexor stretch, thoracic rotations',1,'10 min','—',false,'Good for a stiff lower back after sitting all day.')];
@@ -501,6 +507,36 @@ const PLANS={
  rest2:{name:'Rest',sub:'Recover · Weekly check-in',type:'rest',blocks:[{t:'Recovery',items:[...REST_ITEMS,E('checkin','Check-in: compare your 7-day average weight',1,'Progress tab','—',false),E('prep2','Shop and meal prep for the next cycle',1,'More › Grocery list','—',false)]}]},
  prep:{name:'Prep',sub:'Day 0 · Program starts tomorrow',type:'rest',blocks:[{t:'Get ready',items:[E('shop0','Buy the groceries',1,'More › Grocery list','—',false),E('cook0','Cook rice, chicken and sweet potato for 2 days',1,'about 1 h','—',false),E('photo0','Take starting photos: front, side, back',1,'same light every time','—',false,'Photos show muscle gain better than the scale.'),E('sleep0','In bed early, 7–9 h sleep',1,'tonight','—',false),E('weigh0','Weigh in tomorrow morning before food',1,'Progress tab','—',false)]}]},
 };
+// PPL ×2. A days = heavier compounds, B days = more volume and angles. Back-safe: no squats, deadlifts, bent-over rows, standing overhead presses or twists.
+{
+  const EX={};Object.values(PLANS).forEach(p=>p.blocks.forEach(b=>b.items.forEach(e=>{if(!EX[e.id])EX[e.id]=e})));
+  const X=(id,s,r,rest)=>({...EX[id],s,r,rest:rest||EX[id].rest});
+  const spider=E('spider','Spider curl',3,'10–12','60 s',true,'Chest on an incline bench, arms hanging straight down. Curl without letting the elbows drift forward, squeeze 1 s at the top.');
+  const mcp=E('mcp','Machine chest press',3,'8–12','90 s',true,'Seat so the handles line up with mid-chest. Shoulder blades back, 2 s down.');
+  const xover=E('xover','Low-to-high cable fly',3,'12–15','60 s',true,'Cables low, sweep the hands up to eye level. Targets the upper chest.');
+  const ohext=E('ohext','Overhead cable triceps extension (seated)',3,'12–15','60 s',true,'Sit with your back against a bench, rope behind the head. Full stretch at the bottom, elbows in.');
+  const rpdeck=E('rpdeck','Reverse pec deck',3,'15','60 s',true,'Face the pad, arms straight, open wide and squeeze the rear delts. Light and strict.');
+  const z2=E('z2a','Zone 2: incline walk or bike',1,'10–15 min','—',false,'Optional after lifting. Keeps your heart and recovery in shape without eating the bulk.');
+  Object.assign(PLANS,{
+    pushA:{name:'Push A',sub:'Chest strength · Shoulders · Triceps',type:'train',blocks:[
+      {t:'Lifts',items:[X('bench',4,'5–7','2–3 min'),X('incdb',3,'8–10'),X('sdbp',3,'8–10'),X('latr',4,'12–15','60 s'),X('pdeck',3,'12–15','60 s'),X('push',3,'10–12','60 s'),ohext]}]},
+    pullA:{name:'Pull A',sub:'Back width · Traps · Biceps · Neck',type:'train',blocks:[
+      {t:'Lifts',items:[X('pullup',4,'6–10'),X('csrow',4,'8–10'),X('latpd',3,'10–12','90 s'),X('fpull',3,'15','60 s'),X('shrug',3,'12–15','60 s'),X('curl',3,'8–10','90 s'),spider]},
+      {t:'Neck',items:NECK},{t:'Stamina',items:[z2]}]},
+    legsA:{name:'Legs A',sub:'Quads · Hamstrings · Calves',type:'train',blocks:[
+      {t:'Lifts',items:[X('lpress',4,'8–10','2–3 min'),X('sllp',3,'10 / leg','90 s'),X('lext',3,'12–15','60 s'),X('slcurl',4,'10–12','90 s'),X('hipt',3,'8–10','2 min'),X('scalf',4,'12–15','60 s')]},
+      {t:'Abs B',items:ABS_B}]},
+    pushB:{name:'Push B',sub:'Upper chest · Shoulders · Triceps',type:'train',blocks:[
+      {t:'Lifts',items:[X('incbb',4,'6–8','2–3 min'),mcp,X('mshp',3,'8–10','90 s'),X('latr2',4,'12–15','60 s'),xover,X('dips',3,'8–12','90 s'),X('jmp',3,'8–10','90 s')]}]},
+    pullB:{name:'Pull B',sub:'Back thickness · Rear delts · Biceps',type:'train',blocks:[
+      {t:'Lifts',items:[X('hpd',4,'6–8','2 min'),X('demon',4,'8–10','2 min'),X('dbrow',3,'10 / arm','90 s'),rpdeck,X('shrug',3,'12–15','60 s'),{...spider},X('hammer',3,'10–12','60 s')]},
+      {t:'Neck',items:NECK},{t:'Stamina',items:[{...z2}]}]},
+    legsB:{name:'Legs B',sub:'Glutes · Hamstrings · Quads',type:'train',blocks:[
+      {t:'Lifts',items:[X('hipt',4,'8–10','2 min'),X('llcurl',4,'10–12','90 s'),X('lpress2',3,'10–12','2 min'),X('slext',3,'12–15','60 s'),X('slcurl',3,'12–15','60 s'),X('abduct',3,'15','60 s'),X('lpcalf',4,'12–15','60 s')]},
+      {t:'Abs C',items:ABS_C}]},
+  });
+  if(!DEMO)PLANS.rest={name:'Rest',sub:'Friday · Recover · Walk · Meal prep',type:'rest',blocks:[{t:'Recovery',items:[...REST_ITEMS,E('checkin','Weekly check-in: compare your 7-day average weight',1,'Progress tab','—',false),E('prep','Shop and meal prep for the week',1,'More › Grocery list','—',false)]}]};
+}
 const NODEMO=new Set(['walk','mob','steps','prep','prep2','checkin','shop0','cook0','photo0','sleep0','weigh0']);
 /* ---------- target muscles: one anatomy picture per muscle, lit red (mus/<key>.jpg) ---------- */
 const MUSCLES={chest:'Chest',fdelt:'Front delts',sdelt:'Side delts',rdelt:'Rear delts',triceps:'Triceps',biceps:'Biceps',forearms:'Forearms',lats:'Lats',upback:'Upper back & traps',lowback:'Lower back',abs:'Abs',obliques:'Obliques',quads:'Quads',hams:'Hamstrings',glutes:'Glutes',abduct:'Outer hips',calves:'Calves',neck:'Neck',cardio:'Heart & lungs'};
@@ -508,7 +544,7 @@ const MUSCLES={chest:'Chest',fdelt:'Front delts',sdelt:'Side delts',rdelt:'Rear 
 const EX_MUS={
  bench:['chest','triceps','fdelt'],incdb:['chest','fdelt','triceps'],sdbp:['fdelt','sdelt','triceps'],latr:['sdelt'],dips:['triceps','chest','fdelt'],push:['triceps'],
  cckr:['abs'],mcurl:['abs'],plank:['abs','obliques'],deadbug:['abs'],splank:['obliques','abs'],birddog:['lowback','glutes','abs'],pallof:['obliques','abs'],vacuum:['abs'],frog:['abs'],
- pullup:['lats','biceps','upback'],csrow:['upback','lats','rdelt','biceps'],latpd:['lats','biceps'],demon:['upback','lats','rdelt'],fpull:['rdelt','upback'],shrug:['upback','neck'],shrug2:['upback','neck'],curl:['biceps','forearms'],hammer:['biceps','forearms'],kitty:['forearms'],
+ pullup:['lats','biceps','upback'],csrow:['upback','lats','rdelt','biceps'],latpd:['lats','biceps'],demon:['upback','lats','rdelt'],fpull:['rdelt','upback'],shrug:['upback','neck'],spider:['biceps'],mcp:['chest','triceps','fdelt'],xover:['chest','fdelt'],ohext:['triceps'],rpdeck:['rdelt','upback'],shrug2:['upback','neck'],curl:['biceps','forearms'],hammer:['biceps','forearms'],kitty:['forearms'],
  neck:['neck'],z2a:['cardio'],z2b:['cardio','quads'],hiit:['cardio','quads'],steps:['cardio'],walk:['cardio'],mob:['lowback','glutes'],
  lpress:['quads','glutes','hams'],sllp:['quads','glutes'],lext:['quads'],slcurl:['hams'],hipt:['glutes','hams'],scalf:['calves'],
  incbb:['chest','fdelt','triceps'],hpd:['lats','biceps'],dbrow:['lats','upback','biceps'],mshp:['fdelt','sdelt','triceps'],pdeck:['chest'],latr2:['sdelt'],incurl:['biceps'],jmp:['triceps'],
@@ -518,10 +554,13 @@ const musOf=e=>(Array.isArray(e.m)?e.m:EX_MUS[e.id]||[]).filter(k=>MUSCLES[k]);
 const musPic=k=>ASSET+'mus/'+k+'.jpg';
 const daysBetween=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
 const cycleIdx=s=>{const n=CYCLE.length;return((daysBetween(START,s)%n)+n)%n};
-const planKey=s=>s<START?'prep':CYCLE[cycleIdx(s)];
+const planKey=s=>{
+  if(!DEMO&&!aiActive()&&s<PPL_FROM){if(s<OLD_START)return 'prep';const n=OLD_CYCLE.length;return OLD_CYCLE[((daysBetween(OLD_START,s)%n)+n)%n]}
+  return s<START?'prep':CYCLE[cycleIdx(s)];
+};
 
 /* ---------- demos (public-domain frames from free-exercise-db) & form videos ---------- */
-const IMG={bench:'Barbell_Bench_Press_-_Medium_Grip',incdb:'Incline_Dumbbell_Press',sdbp:'Dumbbell_Shoulder_Press',latr:'Side_Lateral_Raise',dips:'Dips_-_Triceps_Version',push:'Triceps_Pushdown_-_Rope_Attachment',pullup:'Pullups',csrow:'Dumbbell_Incline_Row',latpd:'Wide-Grip_Lat_Pulldown',fpull:'Face_Pull',shrug:'Dumbbell_Shrug',shrug2:'Dumbbell_Shrug',curl:'EZ-Bar_Curl',hammer:'Hammer_Curls',neck:'Lying_Face_Up_Plate_Neck_Resistance',z2a:'Walking_Treadmill',lpress:'Leg_Press',sllp:'Leg_Press',lext:'Leg_Extensions',slcurl:'Seated_Leg_Curl',hipt:'Barbell_Hip_Thrust',scalf:'Seated_Calf_Raise',z2b:'Bicycling_Stationary',incbb:'Barbell_Incline_Bench_Press_-_Medium_Grip',hpd:'Close-Grip_Front_Lat_Pulldown',dbrow:'One-Arm_Dumbbell_Row',mshp:'Machine_Shoulder_Military_Press',pdeck:'Butterfly',latr2:'Seated_Side_Lateral_Raise',incurl:'Incline_Dumbbell_Curl',jmp:'JM_Press',demon:'Lying_T-Bar_Row',kitty:'Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',frog:'Frog_Sit-Ups',lpress2:'Leg_Press',gbridge:'Barbell_Glute_Bridge',llcurl:'Lying_Leg_Curls',slext:'Single-Leg_Leg_Extension',abduct:'Thigh_Abductor',lpcalf:'Calf_Press_On_The_Leg_Press_Machine',cckr:'Knee_Hip_Raise_On_Parallel_Bars',plank:'Plank',deadbug:'Dead_Bug',splank:'Side_Bridge',pallof:'Pallof_Press',vacuum:'Stomach_Vacuum',hiit:'Bicycling_Stationary',iso:'Isometric_Neck_Exercise_-_Sides'};
+const IMG={bench:'Barbell_Bench_Press_-_Medium_Grip',incdb:'Incline_Dumbbell_Press',sdbp:'Dumbbell_Shoulder_Press',latr:'Side_Lateral_Raise',dips:'Dips_-_Triceps_Version',push:'Triceps_Pushdown_-_Rope_Attachment',pullup:'Pullups',csrow:'Dumbbell_Incline_Row',latpd:'Wide-Grip_Lat_Pulldown',fpull:'Face_Pull',spider:'Spider_Curl',mcp:'Machine_Bench_Press',xover:'Low_Cable_Crossover',ohext:'Cable_Rope_Overhead_Triceps_Extension',rpdeck:'Reverse_Machine_Flyes',shrug:'Dumbbell_Shrug',shrug2:'Dumbbell_Shrug',curl:'EZ-Bar_Curl',hammer:'Hammer_Curls',neck:'Lying_Face_Up_Plate_Neck_Resistance',z2a:'Walking_Treadmill',lpress:'Leg_Press',sllp:'Leg_Press',lext:'Leg_Extensions',slcurl:'Seated_Leg_Curl',hipt:'Barbell_Hip_Thrust',scalf:'Seated_Calf_Raise',z2b:'Bicycling_Stationary',incbb:'Barbell_Incline_Bench_Press_-_Medium_Grip',hpd:'Close-Grip_Front_Lat_Pulldown',dbrow:'One-Arm_Dumbbell_Row',mshp:'Machine_Shoulder_Military_Press',pdeck:'Butterfly',latr2:'Seated_Side_Lateral_Raise',incurl:'Incline_Dumbbell_Curl',jmp:'JM_Press',demon:'Lying_T-Bar_Row',kitty:'Palms-Up_Dumbbell_Wrist_Curl_Over_A_Bench',frog:'Frog_Sit-Ups',lpress2:'Leg_Press',gbridge:'Barbell_Glute_Bridge',llcurl:'Lying_Leg_Curls',slext:'Single-Leg_Leg_Extension',abduct:'Thigh_Abductor',lpcalf:'Calf_Press_On_The_Leg_Press_Machine',cckr:'Knee_Hip_Raise_On_Parallel_Bars',plank:'Plank',deadbug:'Dead_Bug',splank:'Side_Bridge',pallof:'Pallof_Press',vacuum:'Stomach_Vacuum',hiit:'Bicycling_Stationary',iso:'Isometric_Neck_Exercise_-_Sides'};
 const FACE_VIDEOS=[
  ['lymph','Face lymphatic drainage massage','face lymphatic drainage massage depuff'],
  ['guasha','Gua sha for the jawline','gua sha jawline tutorial men'],
@@ -1140,7 +1179,7 @@ function viewProgram(){
   const cur=planKey(S.date),edits=Object.keys(S.profile.planEdits||{}).filter(k=>PLANS[k]);
   return `${viewCoachEntry()}
   <section class="card"><div class="row between"><h3>Your cycle</h3><span class="muted num" style="font-size:12px">${CYCLE.length} days · repeats</span></div>
-    <div class="list">${CYCLE.map((k,i)=>{const p=PLANS[k],n=p.blocks.reduce((a,b)=>a+b.items.length,0);return `<div class="li"><span class="dayno ${k===cur?'on':''}">${i+1}</span><div class="t"><b>${esc(p.name)}${edits.includes(k)?' <span class="chip" style="padding:1px 7px;font-size:10px">edited</span>':''}</b><small>${esc(p.sub||'')}${p.type==='train'?' · '+n+' exercises':''}</small></div><button class="demo-btn" data-a="openDay" data-v="${k}">Open</button><button class="demo-btn" data-a="editDay" data-v="${k}">Edit</button></div>`}).join('')}</div>
+    <div class="list">${CYCLE.map((k,i)=>{const p=PLANS[k],n=p.blocks.reduce((a,b)=>a+b.items.length,0);return `<div class="li"><span class="dayno ${k===cur?'on':''}" style="${CYCLE.length===7?'font-size:11px':''}">${CYCLE.length===7?DOW[parse(addDays(START,i)).getDay()]:i+1}</span><div class="t"><b>${esc(p.name)}${edits.includes(k)?' <span class="chip" style="padding:1px 7px;font-size:10px">edited</span>':''}</b><small>${esc(p.sub||'')}${p.type==='train'?' · '+n+' exercises':''}</small></div><button class="demo-btn" data-a="openDay" data-v="${k}">Open</button><button class="demo-btn" data-a="editDay" data-v="${k}">Edit</button></div>`}).join('')}</div>
   </section>
   ${viewIosTimer()}
   <section class="card"><h3>Reminders on your iPhone</h3><p class="muted" style="font-size:13px">Apps inside Claude can't send notifications. Ask Claude for a GYMBRO reminders calendar file: open it on your Mac or iPhone and add it to your calendar to get alerts for meals, water, training and sleep.</p></section>`;
@@ -1257,6 +1296,8 @@ function addLibToDay(x,day){
 
 /* ---------- AI Coach: goals + schedule + optional body photos -> assessment and a full program ---------- */
 const GOALS=[['leanbulk','Lean bulk'],['muscle','Build muscle'],['cut','Lose fat, keep muscle'],['recomp','Recomp'],['strength','Get stronger'],['athletic','Athletic & stamina']];
+const SPLITS=[['auto','Coach decides','Best fit for your days and goal'],['ppl','Push / Pull / Legs','Each muscle once or twice a week'],['ppl2','PPL ×2','6 days, each muscle twice'],['ul','Upper / Lower','4 days, simple and strong'],['full','Full body','2–3 days, everything each session'],['bro','Body-part split','One or two muscles a day'],['arnold','Arnold split','Chest+back, shoulders+arms, legs']];
+const WDAYS=[['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
 const EQUIP=[['gym','Full gym'],['home','Home: dumbbells + bench'],['body','Bodyweight only']];
 const LEVELS=[['beg','Beginner (under 1 year)'],['int','Intermediate (1–3 years)'],['adv','Advanced (3+ years)']];
 const POSE3=[['front','Front'],['side','Side'],['back','Back']];
@@ -1264,7 +1305,7 @@ const lbl=(arr,k)=>(arr.find(x=>x[0]===k)||[k,k])[1];
 function coachDefaults(){
   const prev=S.profile.coachInputs||{};
   const su=DEMO&&S.profile.setup;
-  return{goal:su?{bulk:'leanbulk',cut:'cut',maintain:'recomp'}[su.goal]||'leanbulk':'leanbulk',focus:[],days:su?su.days:5,mins:60,equip:'gym',level:'int',limits:DEMO?'':'Lower back: avoid anything that loads the spine (squats, deadlifts, bent-over rows, standing overhead presses, twists).',notes:'',...prev,start:TODAY};
+  return{split:'auto',restDays:[],goal:su?{bulk:'leanbulk',cut:'cut',maintain:'recomp'}[su.goal]||'leanbulk':'leanbulk',focus:[],days:su?su.days:5,mins:60,equip:'gym',level:'int',limits:DEMO?'':'Lower back: avoid anything that loads the spine (squats, deadlifts, bent-over rows, standing overhead presses, twists).',notes:'',...prev,start:TODAY};
 }
 function latestWeight(){const w=S.profile.weights,d=Object.keys(w).sort().pop();return d?w[d]:REPORT.weight}
 function coachPrompt(change){
@@ -1277,14 +1318,15 @@ function coachPrompt(change){
 CLIENT
 ${DEMO?`- ${S.profile.setup&&S.profile.setup.sex==='f'?'Female':'Male'}, ${REPORT.age}, ${REPORT.height} cm, ${latestWeight()} kg now. Self-reported, no body scan.`:`- Male, ${REPORT.age}, ${REPORT.height} cm, ${latestWeight()} kg now. Body scan on ${REPORT.date}: about ${r1(REPORT.fatKg/REPORT.weight*100)}% body fat, lean and under the standard weight for his height.`}
 - Goal: ${lbl(GOALS,i.goal)}. Muscles to prioritise: ${i.focus.length?i.focus.map(k=>MUSCLES[k]).join(', '):'none named, decide from the assessment'}.
-- Trains ${i.days} days per week, ${i.mins} minutes per session including warm-up. Equipment: ${lbl(EQUIP,i.equip)}. Experience: ${lbl(LEVELS,i.level)}.
+- Split wanted: ${lbl(SPLITS,i.split||'auto')}${(i.split||'auto')==='auto'?' (choose the best split for the goal and schedule)':' (follow it)'}.
+- Trains ${(i.restDays||[]).length?7-i.restDays.length:i.days} days per week, ${i.mins} minutes per session including warm-up. Equipment: ${lbl(EQUIP,i.equip)}. Experience: ${lbl(LEVELS,i.level)}.
 - Injuries and limits: ${i.limits||'none'}.
 - Notes from the client: ${i.notes||'none'}.
 - Eats about ${TARGET.train.kcal} kcal on training days and ${TARGET.rest.kcal} on rest days, ${TARGET.train.p} g protein.
 ${np.length?`\nPHOTOS: ${np.length} body photo(s) are attached, in this order: ${np.join(', ')}. Assess what you can actually see: development of each muscle group, proportions and symmetry, posture (for example forward head, rounded shoulders, pelvic tilt) and a body-fat range. Be specific, honest and encouraging. No medical diagnosis. Base the priorities on what you see.`:'\nNo photos were sent. Base the assessment on the data and say that photos would make it more precise.'}
 
 PROGRAM RULES
-- A repeating cycle of 7 days (one week) with exactly ${i.days} training days and the rest as rest days. Spread rest days sensibly.
+${(i.restDays||[]).length?`- A repeating cycle of 7 days listed in order MONDAY to SUNDAY (day 1 = Monday). Rest days exactly on: ${i.restDays.map(d=>lbl(WDAYS,d)).join(', ')}; every other day is a training day. Name days by their session (e.g. "Push A", "Push B" when a session repeats).`:'- A repeating cycle of 7 days (one week) with exactly ${i.days} training days and the rest as rest days. Spread rest days sensibly.'}
 - Each session fits ${i.mins} minutes: about ${Math.max(3,Math.min(9,Math.round(i.mins/9)))} exercises. Put priority muscles early in the session.
 - Weekly hard sets per muscle: 12–20 for priority muscles, 8–14 for the rest. Train each muscle at least twice a week when the schedule allows.
 - Choose exercises from the RANKED LIBRARY below whenever possible and set "lib" to its key exactly. Prefer higher-ranked moves (the library lists the best first per muscle). Use a move outside the library only when needed, with "lib": null.
@@ -1377,7 +1419,9 @@ function viewCoach(){
     <h3>Muscles to bring up</h3><p class="muted" style="font-size:12.5px">Optional. Leave empty and the coach decides from your photos.</p>${chips('focus',GROUP_ORDER.filter(k=>k!=='cardio').map(k=>[k,MUSCLES[k]]),true)}
     <label class="f">Anything else? (optional)<textarea data-c="coachIn" data-k="notes" maxlength="600" placeholder="e.g. I want wider shoulders and a smaller waist, I play football on Fridays">${esc(i.notes)}</textarea></label>
     ${nav(0,2)}</section>`;
-  if(step===2)return head+`<section class="card"><h3>Days per week</h3>${chips('days',[[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']])}
+  if(step===2)return head+`<section class="card"><h3>Training split</h3><div class="sugg">${SPLITS.map(([v,n,d])=>{const on=(i.split||'auto')===v;return `<button type="button" class="${on?'on':''}" style="${on?'background:var(--brand);color:var(--on-brand);border-color:var(--brand)':''};text-align:left" aria-pressed="${on}" data-a="coachSet" data-k="split" data-v="${v}"><b>${esc(n)}</b><br><small>${esc(d)}</small></button>`}).join('')}</div>
+    <h3>Rest days</h3><p class="muted" style="font-size:12.5px">Pick your fixed days off, or leave empty and the coach spreads them.</p>${chips('restDays',WDAYS,true)}
+    ${(i.restDays||[]).length?`<p class="muted" style="font-size:12.5px">${7-i.restDays.length} training days a week.</p>`:`<h3>Days per week</h3>${chips('days',[[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6']])}`}
     <h3>Time per session</h3>${chips('mins',[[30,'30 min'],[45,'45 min'],[60,'60 min'],[75,'75 min'],[90,'90 min']])}
     <h3>Where you train</h3>${chips('equip',EQUIP)}
     <h3>Experience</h3>${chips('level',LEVELS)}
@@ -1405,7 +1449,7 @@ function viewCoachResult(c){
     ${a.priorities.length?`<h3>Priorities</h3><div class="list">${a.priorities.map(p=>`<div class="li"><img class="prio" src="${musPic(p.muscle)}" alt=""><div class="t"><b>${esc(MUSCLES[p.muscle])}</b><small>${esc(p.why)}</small></div></div>`).join('')}</div>`:''}
     ${list('Posture',a.posture)}</section>
   <section class="card"><div class="eyebrow">${esc(d.split)}</div><h2>${esc(d.title)}</h2>${d.why?`<p style="font-size:14px">${esc(d.why)}</p>`:''}
-    ${c.viewing?'':`<label class="f">Start on<input type="date" value="${esc(c.in.start||TODAY)}" data-c="coachIn" data-k="start"></label>`}</section>
+    ${c.viewing?'':(c.in.restDays||[]).length?`<p class="muted" style="font-size:12.5px">Days follow the weekdays you chose, starting this week.</p>`:`<label class="f">Start on<input type="date" value="${esc(c.in.start||TODAY)}" data-c="coachIn" data-k="start"></label>`}</section>
   <section class="card"><h3>Weekly sets per muscle</h3><p class="muted" style="font-size:12.5px">Hard sets a week (supporting muscles count as half). Research puts most growth between 10 and 20.</p>
     <div class="vol">${vk.map(k=>`<div class="vrow"><span>${esc(MUSCLES[k])}</span><div class="vbar"><i class="zone"></i><i class="fill" style="width:${Math.min(100,vol[k]/25*100)}%"></i></div><b class="num">${vol[k]}</b></div>`).join('')}</div></section>
   ${d.days.map((day,di)=>`<section class="card"><div class="row between"><h3>Day ${di+1} · ${esc(day.name)}</h3><span class="chip ${day.type==='train'?'':'ok'}">${day.type==='train'?'Training':'Rest'}</span></div>${day.sub?`<p class="muted" style="font-size:13px">${esc(day.sub)}</p>`:''}
@@ -1945,7 +1989,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v23 · 16 Nov 2026';
+const APP_VERSION='v24 · 23 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -2083,7 +2127,8 @@ const actions={
     const pe={...(S.profile.planEdits||{})};Object.keys(pe).forEach(k=>{if(/^ai/.test(k))delete pe[k]});S.profile.planEdits=pe;
     const {days,...report}=d;
     const {meals,targets,...rep}=report;
-    S.profile.aiPlan={id:pid,title:d.title,start:c.in.start||TODAY,created:TODAY,inputs:{...c.in},report:rep,meals:meals||null,targets:targets||null,useMeals:!!meals&&c.useMeals!==false,days:days.map((x,i)=>({key:'ai'+pid+'_'+i,name:x.name,sub:x.sub,type:x.type,blocks:x.blocks}))};
+    const mon=(()=>{const t=parse(TODAY),k=(t.getDay()+6)%7;return addDays(TODAY,-k)})();
+    S.profile.aiPlan={id:pid,title:d.title,start:(c.in.restDays||[]).length&&days.length===7?mon:c.in.start||TODAY,created:TODAY,inputs:{...c.in},report:rep,meals:meals||null,targets:targets||null,useMeals:!!meals&&c.useMeals!==false,days:days.map((x,i)=>({key:'ai'+pid+'_'+i,name:x.name,sub:x.sub,type:x.type,blocks:x.blocks}))};
     saveProfile();rebuildPlans();S.coach=null;S.trainDay=null;S.editPlan=false;render();window.scrollTo(0,0);
   },
   coachReport(){const ap=S.profile.aiPlan;if(!ap)return;S.coach={step:'result',viewing:true,in:{...coachDefaults(),...(ap.inputs||{})},photos:{},draft:{...ap.report,meals:ap.meals||null,targets:ap.targets||null,days:CYCLE.map(k=>({name:PLANS[k].name,sub:PLANS[k].sub,type:PLANS[k].type,blocks:PLANS[k].blocks}))}};render();window.scrollTo(0,0)},
@@ -2442,6 +2487,18 @@ Object.assign(actions,{
   },
 });
 
+// 23 Nov 2026: the owner moved to PPL ×2 with Friday off. An active coach program is set aside once
+// (its meal plan and targets are kept), so the new built-in cycle shows.
+function switchToPPL(){
+  if(DEMO||S.profile.migPPL)return;
+  const ap=S.profile.aiPlan;
+  if(validAiPlan(ap)){
+    if(ap.useMeals&&validMeals(ap.meals)&&!validMeals(S.profile.mealPlan))S.profile.mealPlan=JSON.parse(JSON.stringify(ap.meals));
+    if(ap.useMeals&&ap.targets&&!S.profile.targetEdits)S.profile.targetEdits=JSON.parse(JSON.stringify(ap.targets));
+    S.profile.aiPlanPrev=ap;delete S.profile.aiPlan;
+  }
+  S.profile.migPPL=true;saveProfile();rebuildPlans();render();
+}
 // 16 Nov 2026: seated shrugs joined Pull and Upper. Days the user had already edited get them too, once.
 function addShrugsToEdits(){
   if(S.profile.migShrug)return;const pe=S.profile.planEdits||{};
@@ -2476,7 +2533,7 @@ const CHAT_NAMES={food:'Food',train:'Training',grocery:'Grocery'};
 const CHAT_SUGG={food:['Swap the salmon at dinner for chicken','Add 2 boiled eggs to my snack today','Raise rest-day calories by 150','What should I eat to hit protein today?'],
   train:['Add shrugs for my traps','Replace dips with a chest press machine','Make leg day shorter, 45 min max','Which muscles am I not training enough?'],
   grocery:['Add Greek yogurt 2 kg','Remove avocados','I already have rice, take it off','Make the list for 2 weeks']};
-function renderFab(){const f=$('#fab');if(!f)return;const c=chatCtx();f.hidden=!c||!!S.chat||!!S.sheet||(DEMO&&!S.profile.setup)}
+function renderFab(){const f=$('#fab');if(!f)return;const c=chatCtx();f.hidden=!c||!!S.chat||!!S.sheet||(DEMO&&!S.profile.setup);document.body.classList.toggle('hasfab',!f.hidden)}
 function renderChat(){
   const el=$('#chat');if(!el)return;const c=S.chat;
   if(!c){el.innerHTML='';renderFab();return}
@@ -2633,6 +2690,7 @@ document.addEventListener('input',ev=>{if(ev.target.id==='chatIn'&&S.chat)S.chat
   else{if(Cloud.why==='nohost'&&ghCfg()&&ghCfg().gist){try{await ghFill(await ghRead(await ghApi('/gists/'+ghCfg().gist)))}catch(e){}ghPush()}render()}
   await fillPastDays();
   addShrugsToEdits();
+  switchToPPL();
   await computeStreaks();render();
 })();
 </script>
@@ -2640,8 +2698,8 @@ document.addEventListener('input',ev=>{if(ev.target.id==='chatIn'&&S.chat)S.chat
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='c62e632e5f'
-const BUILD_ID='c62e632e5f';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='ee125150df'
+const BUILD_ID='ee125150df';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{
