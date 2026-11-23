@@ -295,7 +295,7 @@ ol.steps{margin:0;padding-left:20px;display:grid;gap:6px;font-size:13.5px}
 h2,h3{color:var(--ink)}
 .eyebrow{color:var(--brand)}
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
-nav.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr)}
 nav.tabbar button{border:0;background:transparent;display:grid;justify-items:center;gap:2px;padding:4px 0;color:var(--muted);font-size:10px;font-weight:600;letter-spacing:.02em;min-width:0}
 nav.tabbar button svg{width:22px;height:22px}
 nav.tabbar button.on{color:var(--brand)}
@@ -314,6 +314,17 @@ body.hasfab main{padding-bottom:64px}
 .chatin textarea{flex:1;min-height:42px;max-height:120px;resize:none;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px;font:inherit}
 .chat{grid-template-rows:auto 1fr auto!important;height:88%}
 .sugg{display:flex;flex-wrap:wrap;gap:6px}.sugg button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 11px;font:inherit;font-size:12.5px}
+.gcal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:8px}
+.gcal .gh{font-size:11px;color:var(--muted);text-align:center;font-weight:600}
+.gd{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-content:center;gap:0;padding:0;font:inherit;line-height:1.05}
+.gd b{font-size:13px}.gd small{font-size:8.5px;opacity:.8}
+.gd.went{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.gd.missed{border:1.5px solid var(--prot);color:var(--prot)}
+.gd.rest{background:var(--surface-2);color:var(--muted)}
+.gd.future,.gd.none,.gd:disabled{opacity:.45}
+.gd.today{outline:2px solid var(--brand);outline-offset:1px}
+.gk{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid var(--line)}
+.gk.went{background:var(--brand);border-color:var(--brand)}.gk.missed{border:1.5px solid var(--prot)}.gk.rest{background:var(--surface-2)}
 .sync{font-size:11px;color:var(--muted);text-align:center;padding-top:4px}
 @media (max-width:380px){.hero{grid-template-columns:1fr;justify-items:center}.macros{width:100%}.stats{grid-template-columns:1fr 1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.demo img+img{animation:none;opacity:0}}
@@ -864,7 +875,7 @@ const blankProfile=()=>({weights:DEMO?{}:{[REPORT.date]:REPORT.weight},customFoo
 const S={date:TODAY,tab:'today',trainDay:null,day:blankDay(),profile:blankProfile(),sheet:null,confirm:null,photos:null,progSub:null,dayCache:{},streaks:null,repData:null};
 try{const t=localStorage.getItem(LS+'tab');if(t)routeTab(t)}catch(e){}
 const dayKey=s=>'day-'+s;
-function saveDay(){save(dayKey(S.date),S.day);S.dayCache[S.date]=S.day;S.repData=null;if(S.date===TODAY)scheduleStreaks()}
+function saveDay(){save(dayKey(S.date),S.day);S.dayCache[S.date]=S.day;S.repData=null;S.gymData=null;if(S.date===TODAY)scheduleStreaks()}
 function saveProfile(){save('profile',S.profile)}
 async function loadDay(){S.day=Object.assign(blankDay(),await load(dayKey(S.date))||{});S.dayCache[S.date]=S.day}
 async function loadProfile(){S.profile=Object.assign(blankProfile(),await load('profile')||{});rebuildPlans()}
@@ -874,13 +885,14 @@ const IC={
  today:'<path d="M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0Z"/><path d="M12 8v4l3 2"/>',
  food:'<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M16 3c-2 1-3 4-3 7h3v11"/>',
  train:'<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>',
+ gym:'<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.6.7-2.8 1.6-3.8.2 1.4 1 2.3 2 2.3 0-2.5-.6-4.6.4-7Z"/><path d="M12 21a6.5 6.5 0 0 0 6.5-6.5"/><path d="M5.5 14.5A6.5 6.5 0 0 0 12 21"/>',
  face:'<path d="M12 3c-4 0-6.5 3-6.5 7 0 3 1 5.5 3 7.5 1 1 2.2 2.5 3.5 2.5s2.5-1.5 3.5-2.5c2-2 3-4.5 3-7.5 0-4-2.5-7-6.5-7Z"/><path d="M9.5 15c1.5 1 3.5 1 5 0"/>',
  progress:'<path d="M4 19h16M5 15l4-4 3 3 6-7"/>',
  shop:'<path d="M5 7h14l-1.5 11a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
  videos:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3V9Z"/>',
  more:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
 };
-const TABS=[['today','Today'],['food','Food'],['train','Train'],['progress','Progress'],['more','More']];
+const TABS=[['today','Today'],['food','Food'],['train','Train'],['gym','Gym'],['progress','Progress'],['more','More']];
 const PLAY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3V9Z"/></svg>';
 const vlink=(href,label='Watch form video')=>`<a class="vlink" href="${href}" target="_blank" rel="noopener">${PLAY}${label}</a>`;
 function renderTabs(){
@@ -1991,7 +2003,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v25 · 23 Nov 2026';
+const APP_VERSION='v26 · 23 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -2023,7 +2035,8 @@ function render(){
   renderHeader();renderTabs();renderSync();renderFab();
   if(DEMO&&(!S.profile.setup||S.editSetup)){$('#tabbar').hidden=!S.profile.setup;$('#view').innerHTML=viewSetup();renderSheet();return}
   $('#tabbar').hidden=false;
-  const v={today:viewToday,food:viewFood,train:viewTrain,progress:viewProgress,more:viewMore}[S.tab]||viewToday;
+  const v={today:viewToday,food:viewFood,train:viewTrain,gym:viewGym,progress:viewProgress,more:viewMore}[S.tab]||viewToday;
+  if(S.tab==='gym'&&!S.gymData&&!S.gymBusy)computeGym();
   $('#view').innerHTML=v();
   if(S.tab==='videos'&&(S.vidTab||'lib')==='lib')filterLib();
   renderSheet();
@@ -2529,6 +2542,64 @@ async function importRecords(data){
 // A picture that cannot load shows a quiet placeholder instead of a broken-image icon.
 document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'&&!t.classList.contains('broken'))t.classList.add('broken')},true);
 
+/* ---------- Gym tab: attendance streak and calendar ---------- */
+// A training day counts as "went" once any set is ticked; a past training day with nothing ticked is "missed".
+// The user can override any day by tapping it (profile.gym[date] = went | missed | rest).
+const GYM_FROM=()=>DEMO?(S.profile.setup||{}).start||TODAY:'2026-11-08';
+const GYM_TXT={went:'Went',missed:'Missed',rest:'Rest day',pending:'Today',future:'',none:''};
+function gymStatus(d,day){
+  const o=(S.profile.gym||{})[d];if(o)return o;
+  if(d<GYM_FROM()||d>TODAY)return d>TODAY?'future':'none';
+  if(Object.values(day.sets||{}).some(a=>Array.isArray(a)&&a.some(Boolean)))return 'went';
+  if(dayType(d)!=='train')return 'rest';
+  return d===TODAY?'pending':'missed';
+}
+async function computeGym(){
+  S.gymBusy=true;const from=GYM_FROM(),st={};
+  for(let d=from,i=0;d<=TODAY&&i<500;d=addDays(d,1),i++)st[d]=gymStatus(d,await getDay(d));
+  const ds=Object.keys(st).sort(),went=ds.filter(d=>st[d]==='went').length,missed=ds.filter(d=>st[d]==='missed').length,rest=ds.filter(d=>st[d]==='rest').length;
+  // Rest days and today (not yet trained) never break a streak; a missed training day does.
+  let cur=0;for(let i=ds.length-1;i>=0;i--){const x=st[ds[i]];if(x==='went')cur++;else if(x==='missed')break}
+  let best=0,run=0;ds.forEach(d=>{if(st[d]==='went'){run++;best=Math.max(best,run)}else if(st[d]==='missed')run=0});
+  const mon=addDays(TODAY,-((parse(TODAY).getDay()+6)%7)),wk=[0,1,2,3,4,5,6].map(i=>addDays(mon,i));
+  const month=TODAY.slice(0,7),inMonth=ds.filter(d=>d.startsWith(month));
+  S.gymData={st,went,missed,rest,cur,best,pct:went+missed?Math.round(went/(went+missed)*100):null,
+    week:{went:wk.filter(d=>st[d]==='went').length,planned:wk.filter(d=>dayType(d)==='train').length},
+    month:{went:inMonth.filter(d=>st[d]==='went').length,missed:inMonth.filter(d=>st[d]==='missed').length}};
+  S.gymBusy=false;if(S.tab==='gym')render();
+}
+function viewGym(){
+  const g=S.gymData;if(!g)return '<section class="card"><div class="spin" aria-hidden="true"></div></section>';
+  const ts=g.st[TODAY]||'pending',isTrain=dayType(TODAY)==='train';
+  const ym=S.gymMonth||TODAY.slice(0,7),[y,m]=ym.split('-').map(Number),first=ym+'-01',dim=new Date(y,m,0).getDate(),lead=(parse(first).getDay()+6)%7;
+  const cells=[...Array(lead).fill('<span></span>'),...Array.from({length:dim},(_,i)=>{const d=ym+'-'+pad(i+1),x=d>TODAY?'future':g.st[d]||'none',pk=planKey(d),p=PLANS[pk];
+    return `<button class="gd ${x}${d===TODAY?' today':''}" ${d>TODAY||d<GYM_FROM()?'disabled':''} data-a="gymTap" data-v="${d}" aria-label="${esc(fmtDate(d))}: ${esc(GYM_TXT[x]||'')}"><b>${i+1}</b><small>${p&&p.type==='train'?esc(p.name.replace(/\s.*$/,'')):''}</small></button>`})].join('');
+  const prevM=ymd(new Date(y,m-2,1)).slice(0,7),nextM=ymd(new Date(y,m,1)).slice(0,7);
+  return `<section class="card gymhero"><div class="row between"><div><div class="eyebrow">Gym streak</div><div class="row" style="align-items:baseline;gap:8px"><b class="num" style="font-size:44px;line-height:1">${g.cur}</b><span style="font-weight:600">${g.cur===1?'session':'sessions'} in a row</span></div><p class="muted" style="font-size:12.5px;margin:4px 0 0">Best streak: ${g.best} · Rest days don't break it, a missed training day does.</p></div><span style="font-size:40px" aria-hidden="true">${g.cur>=10?'🔥':g.cur>=3?'💪':'🏋️'}</span></div>
+    <div style="margin-top:12px">${ts==='went'?`<button class="btn" style="width:100%" data-a="gymSet" data-v="auto">✓ You trained today · Undo</button>`:`<button class="btn" style="width:100%" data-a="gymSet" data-v="went">${isTrain?`I went to the gym today (${esc(PLANS[planKey(TODAY)].name)})`:'Rest day · I trained anyway'}</button>`}</div></section>
+  <section class="card"><div class="stats">
+    <div class="stat"><b class="num" style="color:var(--brand)">${g.went}</b><span>Days went</span></div>
+    <div class="stat"><b class="num" style="color:var(--prot)">${g.missed}</b><span>Days missed</span></div>
+    <div class="stat"><b class="num">${g.pct==null?'—':g.pct+'%'}</b><span>Attendance</span></div>
+    <div class="stat"><b class="num">${g.week.went}/${g.week.planned}</b><span>This week</span></div>
+    <div class="stat"><b class="num">${g.month.went}</b><span>Went in ${MON[parseInt(TODAY.slice(5,7))-1]}</span></div>
+    <div class="stat"><b class="num">${g.rest}</b><span>Rest days</span></div></div>
+    <p class="muted" style="font-size:12px">Counting since ${esc(fmtDate(GYM_FROM()))}.</p></section>
+  <section class="card"><div class="row between"><button class="btn ghost sm" data-a="gymMonth" data-v="${prevM}" aria-label="Previous month">‹</button><h3>${MON[m-1]} ${y}</h3><button class="btn ghost sm" data-a="gymMonth" data-v="${nextM}" aria-label="Next month" ${nextM>TODAY.slice(0,7)?'disabled':''}>›</button></div>
+    <div class="gcal">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<span class="gh">${d}</span>`).join('')}${cells}</div>
+    <div class="row" style="gap:12px;flex-wrap:wrap;font-size:12px;margin-top:8px"><span><i class="gk went"></i>Went</span><span><i class="gk missed"></i>Missed</span><span><i class="gk rest"></i>Rest</span></div>
+    <p class="muted" style="font-size:12px">Ticking a set marks the day as went. Tap any past day to change it: Went → Missed → Rest → automatic.</p></section>`;
+}
+Object.assign(actions,{
+  gymSet(v){const g={...(S.profile.gym||{})};if(v==='auto')delete g[TODAY];else g[TODAY]=v;S.profile.gym=g;
+    // Undo on a day that only counts as "went" because sets are ticked: mark it missed (or rest) instead.
+    if(v==='auto'&&gymStatus(TODAY,S.date===TODAY?S.day:S.dayCache[TODAY]||blankDay())==='went')S.profile.gym={...g,[TODAY]:dayType(TODAY)==='train'?'missed':'rest'};
+    saveProfile();S.gymData=null;render()},
+  gymTap(v){if(v>TODAY)return;const g={...(S.profile.gym||{})},order=['went','missed','rest'],cur=g[v],i=cur?order.indexOf(cur):-1;
+    if(i===order.length-1)delete g[v];else g[v]=order[i+1];S.profile.gym=g;saveProfile();S.gymData=null;render()},
+  gymMonth(v){S.gymMonth=v;render()},
+});
+
 /* ---------- weekly body scan (Dr. Nutrition / InBody report), every Friday ---------- */
 // Stored in profile.scans[date] = {m: metrics, a: AI analysis}. The July baseline scan is the first point.
 const SCAN_FIELDS=[['weight','Weight','kg',1],['smm','Skeletal muscle','kg',1],['slm','Soft lean mass','kg',1],['ffm','Fat-free mass','kg',1],['fatKg','Body fat','kg',-1],['fatPct','Body fat','%',-1],['water','Body water','L',1],['protein','Protein','kg',1],['minerals','Minerals','kg',1],['visceral','Visceral fat','level',-1],['bmr','BMR','kcal',1],['bmi','BMI','',0],['whr','Waist-hip ratio','',-1],['score','InBody score','pts',1]];
@@ -2791,8 +2862,8 @@ document.addEventListener('input',ev=>{if(ev.target.id==='chatIn'&&S.chat)S.chat
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='a5bbb7c97e'
-const BUILD_ID='a5bbb7c97e';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='277efa2972'
+const BUILD_ID='277efa2972';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{
