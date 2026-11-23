@@ -911,6 +911,7 @@ function viewToday(){
   const nm=S.profile.name;
   return `
   ${Cloud.why==='nohost'&&!ghCfg()?`<section class="card callout-card"><div class="row between"><div><h3>Turn on automatic backup</h3><p class="muted" style="font-size:12.5px;margin:2px 0 0">Your logs are only on this phone. One-minute setup keeps a copy in your private GitHub.</p></div><button class="btn sm" data-a="ghOpen">Set up</button></div></section>`:''}
+  ${scanDue()&&daysBetween(lastFriday(),TODAY)<=2?`<section class="card callout-card"><div class="row between"><div><div class="eyebrow">Friday check-in</div><h3>Add your Dr. Nutrition report</h3><p class="muted" style="font-size:12.5px;margin:2px 0 0">Take a photo of this week's scan. The AI reads it and tells you exactly what changed.</p></div><button class="btn sm" data-a="goProg" data-v="scan">Add</button></div></section>`:''}
   ${nm?'':`<section class="card"><h3>What should I call you?</h3><div class="row"><input id="nameIn" type="text" placeholder="Your first name" autocomplete="given-name"><button class="btn" data-a="saveName">Save</button></div></section>`}
   <section class="card">
     <div class="row between"><div><div class="eyebrow">${nm?esc(nm)+' · ':''}${dayType(S.date)==='train'?'Training day':'Rest day'} target</div><h2>${esc(p.name)} day</h2></div>
@@ -1575,11 +1576,11 @@ function chart(){
     <text x="${W-R}" y="${H-10}" text-anchor="end" font-size="11" fill="var(--muted)">${fmtDate(ymd(new Date(t1)))}</text>
   </svg>`;
 }
-const PSUB=[['weight','Weight'],['report','Report'],['strength','Strength'],['photos','Photos'],['body','Body'],['scan','Scan']];
+const PSUB=[['weight','Weight'],['report','Report'],['strength','Strength'],['photos','Photos'],['body','Body'],['scan','Scans']];
 const CHECKIN_DAYS=14;
 function viewProgress(){
   const sub=S.progSub||'weight';
-  const body={weight:progWeight,report:viewReport,strength:viewStrength,photos:viewPhotos,body:viewBody,scan:progScan}[sub]();
+  const body={weight:progWeight,report:viewReport,strength:viewStrength,photos:viewPhotos,body:viewBody,scan:viewScans}[sub]();
   return `<div class="tabs-inline" role="tablist">${PSUB.map(([k,n])=>`<button role="tab" aria-selected="${k===sub}" class="${k===sub?'on':''}" data-a="progSub" data-v="${k}">${n}${dueFor(k)?' ●':''}</button>`).join('')}</div>${body}`;
 }
 function progWeight(){
@@ -1647,6 +1648,7 @@ function dueDate(last){return last?addDays(last,CHECKIN_DAYS):START}
 function dueFor(k){
   if(k==='photos')return S.photos!==null&&TODAY>=dueDate(lastPhotoDate());
   if(k==='body')return TODAY>=dueDate(lastMeasureDate());
+  if(k==='scan')return scanDue();
   return false;
 }
 const dueLabel=d=>d<=TODAY?'Due now':'Next: '+fmtDate(d);
@@ -1989,7 +1991,7 @@ function renderSheet(){
 }
 
 /* ---------- More: secondary screens; old tab names (videos, face, shop) route here or into Train ---------- */
-const APP_VERSION='v24 · 23 Nov 2026';
+const APP_VERSION='v25 · 23 Nov 2026';
 const LOGO=document.querySelector('.logo').src;
 function routeTab(t){
   if(t==='videos'){S.tab='train';S.trainSub='library'}
@@ -2322,6 +2324,7 @@ document.addEventListener('change',ev=>{
   if(c==='cmpA'||c==='cmpB'){S[c]=el.value;render()}
   if(c==='moveTo'){S.moveTo=el.value}
   if(c==='ramS'||c==='ramE'){const r=ramadan(),k=c==='ramS'?'start':'end';if(el.value){S.profile.ramadan={...r,[k]:el.value};saveProfile();render()}}
+  if(c==='scanFile'&&el.files.length){const files=[...el.files].slice(0,3);el.value='';scanRun(files)}
   if(c==='photo'&&el.files[0]){const pose=el.dataset.v,date=S.date,file=el.files[0];(async()=>{
     try{const blob=await shrinkImage(file);await PhotoDB.put({key:date+'|'+pose,date,pose,blob});S.photoErr=''}
     catch(e){S.photoErr='Could not save that photo. Try a JPEG or PNG from your Photos.'}
@@ -2526,6 +2529,96 @@ async function importRecords(data){
 // A picture that cannot load shows a quiet placeholder instead of a broken-image icon.
 document.addEventListener('error',ev=>{const t=ev.target;if(t&&t.tagName==='IMG'&&!t.classList.contains('broken'))t.classList.add('broken')},true);
 
+/* ---------- weekly body scan (Dr. Nutrition / InBody report), every Friday ---------- */
+// Stored in profile.scans[date] = {m: metrics, a: AI analysis}. The July baseline scan is the first point.
+const SCAN_FIELDS=[['weight','Weight','kg',1],['smm','Skeletal muscle','kg',1],['slm','Soft lean mass','kg',1],['ffm','Fat-free mass','kg',1],['fatKg','Body fat','kg',-1],['fatPct','Body fat','%',-1],['water','Body water','L',1],['protein','Protein','kg',1],['minerals','Minerals','kg',1],['visceral','Visceral fat','level',-1],['bmr','BMR','kcal',1],['bmi','BMI','',0],['whr','Waist-hip ratio','',-1],['score','InBody score','pts',1]];
+const lastFriday=()=>{const t=parse(TODAY);return addDays(TODAY,-((t.getDay()+2)%7))};
+function scanList(){
+  const out=Object.entries(S.profile.scans||{}).map(([d,x])=>({date:d,m:x.m||{},a:x.a||null,manual:!!x.manual}));
+  if(!DEMO&&!out.some(x=>x.date===REPORT.date))out.push({date:REPORT.date,m:{weight:REPORT.weight,slm:REPORT.slm,ffm:REPORT.lbm,fatKg:REPORT.fatKg,fatPct:r1(REPORT.fatKg/REPORT.weight*100),bmr:REPORT.bmr,bmi:REPORT.bmi,whr:REPORT.whr},base:true});
+  return out.sort((a,b)=>a.date<b.date?-1:1);
+}
+const scanDue=()=>!Object.keys(S.profile.scans||{}).some(d=>d>=lastFriday());
+async function weekNumbers(from){
+  // Average intake and training since the previous scan (max 14 days), so the AI can link the change to what was eaten.
+  const days=[];for(let d=addDays(TODAY,-1),i=0;d>=from&&i<14;d=addDays(d,-1),i++)days.push(d);
+  let k=0,p=0,n=0,sets=0,planned=0;
+  for(const d of days){const day=S.dayCache[d]||Object.assign(blankDay(),await load(dayKey(d))||{});if(day.foods.length){const t=totals(day.foods);k+=t.k;p+=t.p;n++}const w=workoutProgress(d,day);sets+=w.done;planned+=w.total}
+  return{days:days.length,loggedDays:n,avgKcal:n?r0(k/n):null,avgProtein:n?r0(p/n):null,setsDone:sets,setsPlanned:planned};
+}
+function scanPrompt(prev,week,manual){
+  return `You are a sports nutritionist reading a weekly body composition scan (Dr. Nutrition clinic, InBody-style report) for a client on a ${DEMO?lbl(DGOALS,(S.profile.setup||{}).goal||'bulk').toLowerCase():'lean bulk'}${DEMO?'':' (181 cm, protects his lower back, trains PPL twice a week)'}.
+${manual?'The client typed the numbers in: '+JSON.stringify(manual):'Read every number from the report photo(s). Use null for anything not printed. Weight, muscle and fat in kg; body fat in %; body water in litres.'}
+Goal weight ${GOAL.weight} kg. Targets: ${TARGET.train.kcal} kcal on training days, ${TARGET.rest.kcal} on rest days, ${TARGET.train.p} g protein. Calorie adjustment now: ${S.profile.calAdj||0} kcal.
+Since the previous scan: ${JSON.stringify(week)}.
+Previous scans, oldest first: ${JSON.stringify(prev.map(x=>({date:x.date,...x.m})))}.
+Compare the new scan with the most recent previous one (and with the first one for the long view). Be exact with numbers and honest: scans swing with water and food, so call out when a change is within normal noise (about ±0.5 kg muscle or fat). Explain what each meaningful change means and what to do next week. Keep the language simple.
+Reply with JSON only:
+{"date":"YYYY-MM-DD" or null (the date printed on the report),
+ "metrics":{"weight":n,"smm":n,"slm":n,"ffm":n,"fatKg":n,"fatPct":n,"water":n,"protein":n,"minerals":n,"visceral":n,"bmr":n,"bmi":n,"whr":n,"score":n} (null when missing),
+ "headline":string (one sentence),
+ "verdict":"on track"|"too fast"|"too slow"|"mixed",
+ "changes":[{"what":string,"change":string,"meaning":string}],
+ "wins":[string],"watch":[string],
+ "actions":[{"do":string,"why":string}],
+ "calorie_change":number (suggested kcal/day change for next week, 0 if none)}`;
+}
+async function scanRun(files,manual){
+  const sc=S.scan=S.scan||{};sc.busy=true;sc.err='';render();
+  try{
+    const key=getKey(),sample=key?keySample():(window.claude&&window.claude.use?await window.claude.use('sample'):null);
+    if(!sample)throw{msg:'Add your Anthropic API key first (Food › + › Scan with AI › key settings).'};
+    const prev=scanList().filter(x=>x.date<TODAY),last=prev[prev.length-1];
+    const week=await weekNumbers(last?last.date:addDays(TODAY,-7));
+    const imgs=[];for(const f of files||[])imgs.push(await shrinkImage(f));
+    const out=await sample.json(scanPrompt(prev.slice(-6),week,manual),{images:imgs.length?imgs:undefined,modelTier:'complex',cache:false});
+    const m={},src=manual||out.metrics||{};SCAN_FIELDS.forEach(([k])=>{const v=parseFloat(src[k]);if(isFinite(v)&&v>0)m[k]=k==='whr'?Math.round(v*100)/100:r1(v)});
+    if(!m.weight)throw{msg:'Could not read the weight from that photo. Try a clearer, straight-on photo of the whole report, or type the numbers in.'};
+    const date=/^\d{4}-\d{2}-\d{2}$/.test(out.date||'')&&out.date<=TODAY&&out.date>addDays(TODAY,-14)?out.date:TODAY;
+    const a={headline:String(out.headline||'').slice(0,240),verdict:String(out.verdict||'').slice(0,20),changes:(out.changes||[]).slice(0,10).map(x=>({what:String(x.what||''),change:String(x.change||''),meaning:String(x.meaning||'')})),wins:(out.wins||[]).slice(0,6).map(String),watch:(out.watch||[]).slice(0,6).map(String),actions:(out.actions||[]).slice(0,6).map(x=>({do:String(x.do||''),why:String(x.why||'')})),kcal:Math.max(-500,Math.min(500,r0(+out.calorie_change||0))),week};
+    S.profile.scans={...(S.profile.scans||{}),[date]:{m,a,manual:!!manual}};
+    if(!S.profile.weights[date])S.profile.weights={...S.profile.weights,[date]:m.weight};
+    saveProfile();S.repData=null;sc.open=date;sc.form=false;
+  }catch(e){sc.err=e&&e.msg?e.msg:e&&e.code==='invalid_json'?'The AI reply was cut off. Try again.':e&&e.code==='not_granted'?'Allow GYMBRO to use Claude, then try again.':'Could not analyse the report. Check your internet and try again.'}
+  sc.busy=false;render();
+}
+function scanTable(cur,prev,first){
+  const fmt=v=>v==null?'—':v;
+  const rows=SCAN_FIELDS.filter(([k])=>cur.m[k]!=null).map(([k,n,u,good])=>{
+    const rr=k==='whr'?v=>Math.round(v*100)/100:r1,p=prev&&prev.m[k],f=first&&first.m[k],d=p!=null?rr(cur.m[k]-p):null,df=f!=null?rr(cur.m[k]-f):null;
+    const tone=d==null||Math.abs(d)<0.05||!good?'':((d>0)===(good>0)?'color:var(--ok,#2E8B57)':'color:var(--prot)');
+    return `<tr><td>${esc(n)}${u?` <span class="muted">${u}</span>`:''}</td><td class="num">${fmt(p)}</td><td class="num"><b>${cur.m[k]}</b></td><td class="num" style="${tone}">${d==null?'—':(d>0?'+':'')+d}</td><td class="num muted">${df==null?'—':(df>0?'+':'')+df}</td></tr>`}).join('');
+  return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr class="muted" style="text-align:left;font-size:11.5px"><th></th><th>Last</th><th>Now</th><th>Change</th><th>Since ${first?esc(fmtDate(first.date).slice(4)):'start'}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function viewScans(){
+  const sc=S.scan||{},list=scanList(),real=list.filter(x=>!x.base),show=list.find(x=>x.date===sc.open)||real[real.length-1];
+  const idx=show?list.indexOf(show):-1,prev=idx>0?list[idx-1]:null,first=list[0]!==show?list[0]:null,a=show&&show.a;
+  const due=scanDue();
+  const add=`<section class="card"><div class="row between"><div><div class="eyebrow">Every Friday</div><h3>${due?"Add this week's report":'Next scan on '+esc(fmtDate(addDays(lastFriday(),7)))}</h3></div>${due?'<span class="chip warn">Due</span>':'<span class="chip ok">Done this week</span>'}</div>
+    <p class="muted" style="font-size:13px">Take a straight photo of your Dr. Nutrition report (both pages if there are two). The AI reads every number, compares it with your last scan and your food and training this week, and tells you exactly what changed and what to do.</p>
+    ${sc.busy?'<div class="spin" aria-hidden="true"></div><p style="text-align:center;font-weight:600">Reading your report…</p>':`<div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn" for="scanIn">📷 Photo of report</label><input id="scanIn" type="file" accept="image/*" multiple data-c="scanFile" hidden><button class="btn ghost sm" data-a="scanForm">Type the numbers</button></div>`}
+    ${sc.err?`<p class="callout" style="color:var(--prot);font-size:13px">${esc(sc.err)}</p>`:''}
+    ${sc.form&&!sc.busy?`<div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${SCAN_FIELDS.slice(0,11).map(([k,n,u])=>`<label class="f">${esc(n)}${u?' '+u:''}<input type="number" inputmode="decimal" step="0.1" id="sf-${k}"></label>`).join('')}</div><button class="btn" style="width:100%;margin-top:8px" data-a="scanManual">Analyse</button>`:''}</section>`;
+  const res=show&&!show.base?`<section class="card"><div class="row between"><div><div class="eyebrow">Scan · ${esc(fmtDate(show.date))}</div><h3>${esc(a&&a.headline||'Your numbers')}</h3></div>${a&&a.verdict?`<span class="chip ${/on track/i.test(a.verdict)?'ok':'warn'}">${esc(a.verdict)}</span>`:''}</div>
+    ${scanTable(show,prev,first)}
+    ${a&&a.week&&a.week.avgKcal?`<p class="muted" style="font-size:12.5px">Since the last scan you averaged ${a.week.avgKcal} kcal and ${a.week.avgProtein} g protein on ${a.week.loggedDays} logged days, and did ${a.week.setsDone} of ${a.week.setsPlanned} planned sets.</p>`:''}
+    ${a&&a.changes.length?`<h3>What changed</h3><div class="list">${a.changes.map(x=>`<div class="li"><div class="t"><b>${esc(x.what)} · ${esc(x.change)}</b><small>${esc(x.meaning)}</small></div></div>`).join('')}</div>`:''}
+    ${a&&a.wins.length?`<h3>Wins</h3><ul class="clean" style="font-size:13.5px">${a.wins.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+    ${a&&a.watch.length?`<h3>Watch</h3><ul class="clean" style="font-size:13.5px">${a.watch.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+    ${a&&a.actions.length?`<h3>Next week</h3><div class="list">${a.actions.map(x=>`<div class="li"><div class="t"><b>${esc(x.do)}</b><small>${esc(x.why)}</small></div></div>`).join('')}</div>`:''}
+    ${a&&a.kcal?`<div class="row between callout"><span>Suggested: ${a.kcal>0?'+':''}${a.kcal} kcal a day</span><button class="btn sm" data-a="scanKcal" data-v="${show.date}">${S.profile.scanKcalDone===show.date?'Applied':'Apply'}</button></div>`:''}
+    <div class="row" style="gap:8px;margin-top:6px"><button class="btn ghost sm" data-a="scanDel" data-v="${show.date}">Delete this scan</button></div></section>`:'';
+  const hist=real.length?`<section class="card"><h3>All scans</h3><div class="list">${list.slice().reverse().map(x=>`<button class="li menu" data-a="scanOpen" data-v="${x.date}"><div class="t"><b>${esc(fmtDate(x.date))}${x.base?' · baseline':''}</b><small>${x.m.weight} kg${x.m.smm?' · muscle '+x.m.smm+' kg':x.m.slm?' · lean '+x.m.slm+' kg':''}${x.m.fatPct?' · fat '+x.m.fatPct+'%':''}</small></div>${x.base?'':'<span class="chev" aria-hidden="true">›</span>'}</button>`).join('')}</div></section>`:'';
+  return add+res+hist+(DEMO?'':progScan());
+}
+Object.assign(actions,{
+  scanForm(){const sc=S.scan=S.scan||{};sc.form=!sc.form;render()},
+  scanManual(){const m={};SCAN_FIELDS.forEach(([k])=>{const el=$('#sf-'+k);if(el&&el.value)m[k]=el.value});if(!m.weight){S.scan.err='Enter at least your weight.';render();return}scanRun([],m)},
+  scanOpen(v){const sc=S.scan=S.scan||{};sc.open=v;render();window.scrollTo(0,0)},
+  scanDel(v){if(!confirm('Delete the scan from '+fmtDate(v)+'?'))return;const x={...(S.profile.scans||{})};delete x[v];S.profile.scans=x;saveProfile();if(S.scan)S.scan.open=null;render()},
+  scanKcal(v){const sc=(S.profile.scans||{})[v];if(!sc||!sc.a||!sc.a.kcal||S.profile.scanKcalDone===v)return;S.profile.calAdj=(S.profile.calAdj||0)+sc.a.kcal;S.profile.scanKcalDone=v;saveProfile();render()},
+});
+
 /* ---------- AI chat: edits food, training and groceries on request ---------- */
 // Runs on the viewer's Anthropic API key when one is saved, otherwise on Claude inside the Claude app.
 const chatCtx=()=>S.tab==='food'?'food':S.tab==='train'?'train':S.tab==='more'&&S.moreSub==='shop'?'grocery':null;
@@ -2698,8 +2791,8 @@ document.addEventListener('input',ev=>{if(ev.target.id==='chatIn'&&S.chat)S.chat
 
 <style>.updbar{position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:616px;margin:0 auto;border:0;border-radius:14px;padding:13px 16px;font:700 15px/1.2 system-ui,sans-serif;background:#6E1F2E;color:#FFF8EE;box-shadow:0 8px 24px rgb(0 0 0 / .3)}</style>
 <script>
-// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='ee125150df'
-const BUILD_ID='ee125150df';
+// Older installs look for APP_VERSION='BUILD' in this file to offer an update: APP_VERSION='a5bbb7c97e'
+const BUILD_ID='a5bbb7c97e';
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 async function checkUpdate(){
   try{
